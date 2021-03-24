@@ -85,7 +85,6 @@ void Editor::onAsmChanged()
     for (const QString &line : m_asmEdit->toPlainText().split('\n')) {
         parseToBinary(line, &num);
     }
-    qDebug() << m_labels;
 
     m_binOutput->clear();
     m_memory.clear();
