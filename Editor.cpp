@@ -12,6 +12,13 @@
 #include <QPushButton>
 #include <QMessageBox>
 #include <QLabel>
+#include <QSettings>
+#include <QStandardPaths>
+#include <QDir>
+#include <QDateTime>
+#include <QSaveFile>
+#include <QTimer>
+#include <QFileDialog>
 
 Editor::Editor(QWidget *parent)
     : QWidget(parent),
@@ -75,6 +82,20 @@ Editor::Editor(QWidget *parent)
     connect(uploadButton, &QPushButton::clicked, this, &Editor::onUploadClicked);
     connect(m_asmEdit->verticalScrollBar(), &QScrollBar::valueChanged, m_binOutput->verticalScrollBar(), &QScrollBar::setValue);
     connect(m_asmEdit, &QPlainTextEdit::textChanged, this, &Editor::onAsmChanged);
+
+    QSettings settings;
+    loadFile(settings.value("lastOpenedFile").toString());
+
+    QTimer *timer = new QTimer(this);
+    timer->setSingleShot(true);
+    connect(timer, &QTimer::timeout, this, &Editor::save);
+    timer->setInterval(500);
+    connect(m_asmEdit, &QPlainTextEdit::textChanged, timer, [timer]() { timer->start(); });
+}
+
+Editor::~Editor()
+{
+    save();
 }
 
 void Editor::onAsmChanged()
@@ -128,6 +149,76 @@ void Editor::onUploadClicked()
         return;
     }
     qWarning() << serialPort.readAll();
+}
+
+bool Editor::loadFile(const QString &path)
+{
+    if (path.isEmpty()) {
+        return false;
+    }
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qDebug() << "Failed to open" << path << file.errorString();
+        return false;
+    }
+    const QByteArray content = file.readAll();
+    if (content.isEmpty()) {
+        qDebug() << "No content in" << path;
+        return false;
+    }
+
+    QSignalBlocker blocker(m_asmEdit); // don't trigger the save timer
+    m_asmEdit->setPlainText(QString::fromUtf8(content));
+    onAsmChanged();
+
+    m_currentFile = path;
+    QSettings settings;
+    settings.setValue("lastOpenedFile", path);
+    qDebug() << "Loaded" << path;
+    return true;
+}
+
+void Editor::saveAs()
+{
+    QString newPath = QFileDialog::getSaveFileName(this, "Select file to save to", QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation), "Ben Assembly File (*.basm)");
+    if (newPath.isEmpty()) {
+        return;
+    }
+    m_currentFile = newPath;
+    save();
+}
+
+bool Editor::save()
+{
+    if (m_currentFile.isEmpty()) {
+        m_currentFile = generateTempFilename();
+    }
+    QSaveFile file(m_currentFile);
+    if (!file.open(QIODevice::WriteOnly)) {
+        qWarning() << "Failed to open" << m_currentFile << file.errorString();
+        m_currentFile = generateTempFilename();
+        file.setFileName(m_currentFile);
+
+        if (!file.open(QIODevice::WriteOnly)) {
+            qWarning() << "Failed to open generated" << m_currentFile << file.errorString();
+            return false;
+        }
+    }
+    QSettings settings;
+    settings.setValue("lastOpenedFile", m_currentFile);
+
+    file.write(m_asmEdit->toPlainText().toUtf8());
+    file.commit();
+
+    return true;
+}
+
+QString Editor::generateTempFilename()
+{
+    QDir dir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
+    dir.mkpath(dir.absolutePath());
+    return dir.filePath(QDateTime::currentDateTime().toString(Qt::ISODate)) + ".basm";
 }
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c %c%c%c%c"

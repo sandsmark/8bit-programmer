@@ -14,12 +14,19 @@ class Editor : public QWidget
 
 public:
     Editor(QWidget *parent = nullptr);
+    ~Editor();
 
 private slots:
     void onAsmChanged();
     void onUploadClicked();
+    bool save();
 
 private:
+    bool loadFile(const QString &path);
+    void saveAs();
+
+    static QString generateTempFilename();
+
     QString parseToBinary(const QString &line, int *num);
     struct Operator {
         uint8_t opcode;
@@ -35,4 +42,6 @@ private:
     QComboBox *m_serialPort = nullptr;
 
     QHash<QString, uint32_t> m_labels;
+
+    QString m_currentFile;
 };
