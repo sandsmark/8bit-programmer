@@ -35,6 +35,7 @@ private:
 
     int currentLineNumber();
     void scrollOutputTo(const int line);
+    void highlightOutput(const int firstLine, const int lastLine);
 
     static QString generateTempFilename();
 

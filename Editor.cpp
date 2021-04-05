@@ -171,17 +171,18 @@ void Editor::onAsmChanged()
     m_outputLineNumbers.clear();
     num = 0;
     int outputLineNum = 0;
-    m_outputLineNumbers.append(0);
+//    m_outputLineNumbers.append(0);
     for (const QString &line : m_asmEdit->toPlainText().split('\n')) {
         const QString output = parseToBinary(line, &num);
 
         // TODO: no point in trying to sync up empty lines when there isn't 1-1 mapping between lines
         if (m_type != Type::BenEater && output.isEmpty()) {
+            m_outputLineNumbers.append(outputLineNum);
             continue;
         }
 
-        outputLineNum += output.count('\n') + 1;
         m_outputLineNumbers.append(outputLineNum);
+        outputLineNum += output.count('\n') + 1;
 
         m_binOutput->insertPlainText(output + "\n");
     }
@@ -293,8 +294,33 @@ void Editor::onScrolled()
 
 void Editor::onCursorMoved()
 {
-    qDebug() << currentLineNumber();
-    scrollOutputTo(currentLineNumber());
+    // does jack shit
+//    m_binOutput->textCursor().clearSelection();
+
+    m_binOutput->moveCursor(QTextCursor::Start, QTextCursor::KeepAnchor);
+    m_binOutput->moveCursor(QTextCursor::Start, QTextCursor::MoveAnchor);
+
+    const int asmLine = currentLineNumber();
+
+    if (asmLine >= m_outputLineNumbers.size()) {
+        qWarning() << "Line out of range" << asmLine;
+        m_binOutput->verticalScrollBar()->setValue(m_binOutput->verticalScrollBar()->maximum());
+        return;
+    }
+    const int startLine = m_outputLineNumbers[asmLine];
+    if (startLine == -1) {
+        return;
+    }
+
+    int endLine = -1;
+    if (asmLine + 1 < m_outputLineNumbers.size()) {
+        endLine = m_outputLineNumbers[asmLine + 1];
+    }
+
+
+    highlightOutput(startLine, endLine);
+    m_binOutput->ensureCursorVisible();
+//    m_binOutput->verticalScrollBar()->setValue(startLine);
 }
 
 void Editor::scrollOutputTo(const int line)
@@ -305,6 +331,35 @@ void Editor::scrollOutputTo(const int line)
         return;
     }
     m_binOutput->verticalScrollBar()->setValue(m_outputLineNumbers[line]);
+}
+
+void Editor::highlightOutput(const int firstLine, const int lastLine)
+{
+    QTextCursor cursor = m_binOutput->textCursor();
+    cursor.clearSelection();
+
+    m_binOutput->moveCursor(QTextCursor::Start);
+
+    int line = 0;
+    while (!cursor.atEnd()) {
+        line += cursor.block().lineCount();
+        if (line > firstLine) {
+            break;
+        }
+        m_binOutput->moveCursor(QTextCursor::NextBlock, QTextCursor::MoveAnchor);
+    }
+
+    if (lastLine == firstLine) {
+        return;
+    }
+
+    while (!cursor.atEnd()) {
+        m_binOutput->moveCursor(QTextCursor::NextBlock, QTextCursor::KeepAnchor);
+        line += cursor.block().lineCount();
+        if (line != -1 && line >= lastLine) {
+            break;
+        }
+    }
 }
 
 bool Editor::save()
