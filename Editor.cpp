@@ -585,7 +585,7 @@ void SyntaxHighlighter::highlightBlock(const QString &text)
             setFormat(match.capturedStart(), match.capturedLength(), opcodeFormat);
         }
 
-        expression.setPattern("^[a-zA-Z ]+([0-9]+|0x[0-9A-Fa-f]+)");
+        expression.setPattern("^[a-zA-Z ]+(0x[0-9A-Fa-f]+|[0-9]+)");
         i = expression.globalMatch(text);
         while (i.hasNext()) {
             QRegularExpressionMatch match = i.next();
