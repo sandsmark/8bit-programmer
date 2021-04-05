@@ -128,6 +128,7 @@ void serialEvent()
                 value = 0;
                 state = VALUE_FIRST;
                 continue;
+            case 'r': // Run, reset, whatever
             case 'R': // Run, reset, whatever
                 run();
             default:

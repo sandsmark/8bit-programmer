@@ -12,18 +12,29 @@ class Editor : public QWidget
 {
     Q_OBJECT
 
+    enum class Type {
+        BenEater,
+        ExtendedMemory
+    };
+
 public:
     Editor(QWidget *parent = nullptr);
     ~Editor();
 
 private slots:
+    void onTypeChanged();
     void onAsmChanged();
     void onUploadClicked();
     bool save();
+    void onScrolled();
+    void onCursorMoved();
 
 private:
     bool loadFile(const QString &path);
     void saveAs();
+
+    int currentLineNumber();
+    void scrollOutputTo(const int line);
 
     static QString generateTempFilename();
 
@@ -41,7 +52,14 @@ private:
     QPlainTextEdit *m_memContents = nullptr;
     QComboBox *m_serialPort = nullptr;
 
+    QComboBox *m_typeDropdown = nullptr;
+
+    QPlainTextEdit *m_serialOutput = nullptr;
+
     QHash<QString, uint32_t> m_labels;
+    QVector<int> m_outputLineNumbers;
 
     QString m_currentFile;
+
+    Type m_type = Type::BenEater;
 };

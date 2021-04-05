@@ -19,6 +19,13 @@
 #include <QSaveFile>
 #include <QTimer>
 #include <QFileDialog>
+#include <QTextBlock>
+
+#include <QtMath>
+
+static const char *s_settingsKeyType = "Type";
+static const char *s_settingsValOrig = "Original";
+static const char *s_settingsValExt = "Extended";
 
 Editor::Editor(QWidget *parent)
     : QWidget(parent),
@@ -40,6 +47,19 @@ Editor::Editor(QWidget *parent)
     // TODO: make user definable, need another tab
 
     QVBoxLayout *mainLayout = new QVBoxLayout;
+
+    QHBoxLayout *topLayout = new QHBoxLayout;
+    mainLayout->addLayout(topLayout);
+
+    topLayout->addStretch();
+
+    topLayout->addWidget(new QLabel("CPU Type:"));
+
+    m_typeDropdown = new QComboBox;
+    m_typeDropdown->addItems({"Original Ben Eater (4 bit memory)", "Extended (8 bit memory"});
+    topLayout->addWidget(m_typeDropdown);
+
+
     QHBoxLayout *editorLayout = new QHBoxLayout;
     editorLayout->setMargin(0);
 
@@ -76,15 +96,34 @@ Editor::Editor(QWidget *parent)
     uploadLayout->addWidget(m_serialPort);
     uploadLayout->addWidget(uploadButton);
 
+    QHBoxLayout *uploadBottomLayout = new QHBoxLayout;
+    mainLayout->addLayout(uploadBottomLayout);
+
     m_memContents = new QPlainTextEdit;
-    mainLayout->addWidget(m_memContents);
+    m_memContents->setReadOnly(true);
+    uploadBottomLayout->addWidget(m_memContents);
+
+    m_serialOutput = new QPlainTextEdit;
+    m_serialOutput->setReadOnly(true);
+    m_serialOutput->setPlaceholderText("Serial response");
+    uploadBottomLayout->addWidget(m_serialOutput);
 
     connect(uploadButton, &QPushButton::clicked, this, &Editor::onUploadClicked);
-    connect(m_asmEdit->verticalScrollBar(), &QScrollBar::valueChanged, m_binOutput->verticalScrollBar(), &QScrollBar::setValue);
+    connect(m_asmEdit->verticalScrollBar(), &QScrollBar::valueChanged, this, &Editor::onScrolled);
     connect(m_asmEdit, &QPlainTextEdit::textChanged, this, &Editor::onAsmChanged);
+    connect(m_asmEdit, &QPlainTextEdit::cursorPositionChanged, this, &Editor::onCursorMoved);
+    connect(m_typeDropdown, &QComboBox::currentTextChanged, this, &Editor::onTypeChanged); // meh, use currenttext because the other is overloaded
 
     QSettings settings;
     loadFile(settings.value("lastOpenedFile").toString());
+
+    const QString lastType = settings.value(s_settingsKeyType).toString();
+    if (lastType == s_settingsValExt) {
+        m_type = Type::ExtendedMemory;
+        m_typeDropdown->setCurrentIndex(1);
+    } else {
+        m_type = Type::BenEater;
+    }
 
     QTimer *timer = new QTimer(this);
     timer->setSingleShot(true);
@@ -98,20 +137,49 @@ Editor::~Editor()
     save();
 }
 
+void Editor::onTypeChanged()
+{
+    QSettings settings;
+    switch(m_typeDropdown->currentIndex()) {
+    case 0:
+        m_type = Type::BenEater;
+        settings.setValue("Type", "Original");
+        break;
+    case 1:
+        settings.setValue("Type", "Extended");
+        m_type = Type::ExtendedMemory;
+        break;
+    }
+    onAsmChanged();
+}
+
 void Editor::onAsmChanged()
 {
     m_labels.clear();
     int num = 0;
-    // TODO: better way
+    // TODO: better way to resolve names
     for (const QString &line : m_asmEdit->toPlainText().split('\n')) {
         parseToBinary(line, &num);
     }
 
     m_binOutput->clear();
     m_memory.clear();
+    m_outputLineNumbers.clear();
     num = 0;
+    int outputLineNum = 0;
+    m_outputLineNumbers.append(0);
     for (const QString &line : m_asmEdit->toPlainText().split('\n')) {
-        m_binOutput->insertPlainText(parseToBinary(line, &num) + "\n");
+        const QString output = parseToBinary(line, &num);
+
+        // TODO: no point in trying to sync up empty lines when there isn't 1-1 mapping between lines
+        if (m_type != Type::BenEater && output.isEmpty()) {
+            continue;
+        }
+
+        outputLineNum += output.count('\n') + 1;
+        m_outputLineNumbers.append(outputLineNum);
+
+        m_binOutput->insertPlainText(output + "\n");
     }
 
     m_memContents->clear();
@@ -142,7 +210,7 @@ void Editor::onUploadClicked()
 
     serialPort.write("\n");
     serialPort.write(m_memContents->toPlainText().toLatin1());
-    serialPort.write("\n");
+    serialPort.write("\nR\n"); // R == run/reset/whatever
 
     if (!serialPort.waitForBytesWritten(1000)) {
         QMessageBox::warning(this, "Timeout", "Timed out trying to write to serial port");
@@ -189,6 +257,52 @@ void Editor::saveAs()
     save();
 }
 
+int Editor::currentLineNumber()
+{
+    // holy fuck qt
+
+    QTextCursor cursor = m_asmEdit->textCursor();
+    cursor.movePosition(QTextCursor::StartOfLine);
+
+    int lines = 0;
+    while (cursor.positionInBlock() > 0) {
+        cursor.movePosition(QTextCursor::Up);
+        lines++;
+    }
+    QTextBlock block = cursor.block().previous();
+
+    while(block.isValid()) {
+        lines += block.lineCount();
+        block = block.previous();
+    }
+
+    return lines;
+}
+void Editor::onScrolled()
+{
+
+//    qDebug() << m_asmEdit->verticalScrollBar()->value() << m_asmEdit->verticalScrollBar()->maximum();
+//    float relativeValue = float(m_asmEdit->verticalScrollBar()->value()) / m_asmEdit->verticalScrollBar()->maximum();
+    int asmLine = m_asmEdit->verticalScrollBar()->value();
+    scrollOutputTo(asmLine);
+}
+
+void Editor::onCursorMoved()
+{
+    qDebug() << currentLineNumber();
+    scrollOutputTo(currentLineNumber());
+}
+
+void Editor::scrollOutputTo(const int line)
+{
+    if (line >= m_outputLineNumbers.size()) {
+        qWarning() << "Line out of range" << line;
+        m_binOutput->verticalScrollBar()->setValue(m_binOutput->verticalScrollBar()->maximum());
+        return;
+    }
+    m_binOutput->verticalScrollBar()->setValue(m_outputLineNumbers[line]);
+}
+
 bool Editor::save()
 {
     if (m_currentFile.isEmpty()) {
@@ -213,6 +327,7 @@ bool Editor::save()
 
     return true;
 }
+
 
 QString Editor::generateTempFilename()
 {
@@ -252,7 +367,7 @@ QString Editor::parseToBinary(const QString &line, int *num)
         return " ; Label '" + op + "'";
     }
 
-    uint8_t binary = 0;
+    uint16_t binary = 0;
     uint32_t address = 0;
 
     QString helpText;
@@ -286,11 +401,15 @@ QString Editor::parseToBinary(const QString &line, int *num)
         if (tokens.count() != m_ops[op].numArguments + 1) {
             return "; Operator '" + op + "' takes " + QString::number(m_ops[op].numArguments) + " argument(s)";
         }
-        binary = m_ops[op].opcode << 4;
+        if (m_type == Type::BenEater) {
+            binary = m_ops[op].opcode << 4;
+            (*num)++;
+        } else {
+            binary = m_ops[op].opcode << 8;
+        }
         address = *num;
         helpText = m_ops[op].help;
 
-        (*num)++;
     }
 
     if (tokens.count() > 1) {
@@ -308,28 +427,57 @@ QString Editor::parseToBinary(const QString &line, int *num)
         if (!ok) {
             return "; Invalid value '" + tokens[1] + "'";
         }
-        if (value > 0xF && op != ".db") {
+
+        if (value > 0xF && (m_type == Type::BenEater && op != ".db")) {
             return "; Value out of range: " + QString::number(value);
         }
+
         if (op == ".db") {
             helpText = helpText.arg(address).arg(value);
         } else {
             helpText = helpText.arg(value);
         }
 
-        binary |= value & 0xF;
+        if (m_type == Type::BenEater) {
+            binary |= value & 0xF;
+        } else {
+            binary |= value & 0xFF;
+        }
     }
 
-    const QByteArray binaryString = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(binary)).toLatin1();
-    const QByteArray addressString = QString::asprintf(NIBBLE_TO_BINARY_PATTERN, NIBBLE_TO_BINARY(address)).toLatin1();
-
-    if (m_memory.contains(address)) {
-        // TODO: track line numbers
-        return "; Memory address " + QString::number(address) + " overwrites another value (" + QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(m_memory[address])).toLatin1() + ")";
+    QString ret;
+    if (m_type == Type::ExtendedMemory) {
+        ret = "; " + line.mid(0, eol).simplified() + ": " + helpText + "\n";
+        helpText.clear();
     }
-    m_memory[address] = binary;
+    for (int i=0; i<2; i++) {
+        const QByteArray binaryString = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(binary & 0xFF)).toLatin1();
+        const QByteArray addressString = QString::asprintf(NIBBLE_TO_BINARY_PATTERN, NIBBLE_TO_BINARY(address)).toLatin1();
 
-    return QString::asprintf("%s: %s\t; %s", addressString.constData(), binaryString.constData(), helpText.toUtf8().constData());
+        if (m_memory.contains(address)) {
+            // TODO: track line numbers
+            const QString otherValue = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(m_memory[address]));
+            const QString otherAddressBin = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(address));
+            return "; Memory address " + QString::number(address) + " (" + otherAddressBin + ") overwrites another value (" + otherValue + ")";
+        }
+        m_memory[address] = binary;
+
+        ret += QString::asprintf("%s: %s", addressString.constData(), binaryString.constData());
+
+        if (!helpText.isEmpty()) {
+            ret += "\t; " + helpText;
+        }
+
+        if (m_type == Type::BenEater || op == ".db") {
+            break;
+        }
+
+        address++;
+        (*num)++;
+        binary >>= 8;
+        ret += "\n";
+    }
+    return ret;
 //    return QString::asprintf("0x%.2x = 0x%.2x \t; %s = %s", address, binary, addressString.constData(), binaryString.constData());
 }
 
