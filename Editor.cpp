@@ -512,7 +512,12 @@ QString Editor::parseToBinary(const QString &line, int *num)
     }
     for (int i=0; i<2; i++) {
         const QByteArray binaryString = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(binary & 0xFF)).toLatin1();
-        const QByteArray addressString = QString::asprintf(NIBBLE_TO_BINARY_PATTERN, NIBBLE_TO_BINARY(address)).toLatin1();
+        QByteArray addressString;
+        if (m_type == Type::BenEater) {
+            addressString = QString::asprintf(NIBBLE_TO_BINARY_PATTERN, NIBBLE_TO_BINARY(address)).toLatin1();
+        } else {
+            addressString = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(address)).toLatin1();
+        }
 
         if (m_memory.contains(address)) {
             // TODO: track line numbers
@@ -552,7 +557,6 @@ void SyntaxHighlighter::highlightBlock(const QString &text)
     varFormat.setForeground(Qt::darkYellow);
 
     QTextCharFormat addressFormat;
-    addressFormat.setFontWeight(QFont::Bold);
     addressFormat.setForeground(Qt::darkMagenta);
 
     QColor binColor(Qt::darkCyan);
@@ -583,7 +587,7 @@ void SyntaxHighlighter::highlightBlock(const QString &text)
             setFormat(match.capturedStart(1), match.capturedLength(1), varFormat);
         }
     } else {
-        expression.setPattern("([01]+):\\s+([01]+)\\s+([01]+)");
+        expression.setPattern("([01 ]+):\\s+([01]+)\\s+([01]+)");
         i = expression.globalMatch(text);
 
         while (i.hasNext()) {
