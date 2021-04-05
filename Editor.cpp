@@ -63,7 +63,6 @@ Editor::Editor(QWidget *parent)
     m_typeDropdown->addItems({"Original Ben Eater (4 bit memory)", "Extended (8 bit memory"});
     topLayout->addWidget(m_typeDropdown);
 
-
     QHBoxLayout *editorLayout = new QHBoxLayout;
     editorLayout->setMargin(0);
 
@@ -72,10 +71,12 @@ Editor::Editor(QWidget *parent)
 
     // Editor
     m_asmEdit = new QPlainTextEdit;
+    new SyntaxHighlighter(m_asmEdit->document(), m_ops.keys());
     editorLayout->addWidget(m_asmEdit);
 
     m_binOutput = new QPlainTextEdit;
     m_binOutput->setReadOnly(true);
+    new SyntaxHighlighter(m_binOutput->document(), {});
     editorLayout->addWidget(m_binOutput);
 
     // Uploader
@@ -540,3 +541,57 @@ QString Editor::parseToBinary(const QString &line, int *num)
 //    return QString::asprintf("0x%.2x = 0x%.2x \t; %s = %s", address, binary, addressString.constData(), binaryString.constData());
 }
 
+
+void SyntaxHighlighter::highlightBlock(const QString &text)
+{
+    QTextCharFormat commentFormat;
+    commentFormat.setForeground(Qt::darkGray);
+    QTextCharFormat opcodeFormat;
+    opcodeFormat.setForeground(Qt::darkGreen);
+    QTextCharFormat varFormat;
+    varFormat.setForeground(Qt::darkYellow);
+
+    QTextCharFormat addressFormat;
+    addressFormat.setFontWeight(QFont::Bold);
+    addressFormat.setForeground(Qt::darkMagenta);
+
+    QColor binColor(Qt::darkCyan);
+    QTextCharFormat binFormat1;
+    binFormat1.setForeground(binColor);
+    QTextCharFormat binFormat2;
+    binFormat2.setForeground(binColor.darker(150));
+
+    QRegularExpression expression(";.*$");
+    QRegularExpressionMatchIterator i = expression.globalMatch(text);
+    while (i.hasNext()) {
+        QRegularExpressionMatch match = i.next();
+        setFormat(match.capturedStart(), match.capturedLength(), commentFormat);
+    }
+
+    if (!m_ops.isEmpty()) {
+        expression.setPattern("^\\s*(" + m_ops.join('|') + ")\\b");
+        QRegularExpressionMatchIterator i = expression.globalMatch(text);
+        while (i.hasNext()) {
+            QRegularExpressionMatch match = i.next();
+            setFormat(match.capturedStart(), match.capturedLength(), opcodeFormat);
+        }
+
+        expression.setPattern("^[a-zA-Z ]+([0-9]+|0x[0-9A-Fa-f]+)");
+        i = expression.globalMatch(text);
+        while (i.hasNext()) {
+            QRegularExpressionMatch match = i.next();
+            setFormat(match.capturedStart(1), match.capturedLength(1), varFormat);
+        }
+    } else {
+        expression.setPattern("([01]+):\\s+([01]+)\\s+([01]+)");
+        i = expression.globalMatch(text);
+
+        while (i.hasNext()) {
+            QRegularExpressionMatch match = i.next();
+            setFormat(match.capturedStart(1), match.capturedLength(1), addressFormat);
+            setFormat(match.capturedStart(2), match.capturedLength(2), binFormat1);
+            setFormat(match.capturedStart(3), match.capturedLength(3), binFormat2);
+        }
+
+    }
+}

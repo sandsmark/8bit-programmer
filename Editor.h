@@ -3,10 +3,23 @@
 #include <QWidget>
 #include <QHash>
 #include <QMap>
+#include <QSyntaxHighlighter>
 
 
 class QPlainTextEdit;
 class QComboBox;
+
+class SyntaxHighlighter : public QSyntaxHighlighter
+{
+    Q_OBJECT
+public:
+    SyntaxHighlighter(QTextDocument *document, const QStringList &ops) : QSyntaxHighlighter(document), m_ops(ops) {}
+
+protected:
+    void highlightBlock(const QString &text) override;
+
+    const QStringList m_ops;
+};
 
 class Editor : public QWidget
 {
