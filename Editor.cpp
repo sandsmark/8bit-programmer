@@ -549,6 +549,11 @@ QString Editor::parseToBinary(const QString &line, int *num)
 
 void SyntaxHighlighter::highlightBlock(const QString &text)
 {
+    QTextCharFormat errorFormat;
+    errorFormat.setForeground(Qt::darkRed);
+    errorFormat.setFontWeight(QFont::Bold);
+    setFormat(0, text.length(), errorFormat);
+
     QTextCharFormat commentFormat;
     commentFormat.setForeground(Qt::darkGray);
     QTextCharFormat opcodeFormat;
