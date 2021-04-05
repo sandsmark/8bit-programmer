@@ -6,15 +6,19 @@
 #define SHIFT_CLK 3
 #define SHIFT_LATCH 4
 
-#define HALT 5
-#define RESET 6
+#define BUS_OUT 5
 
-#define ROM_DISCONNECT 7
+// Pin 6 is LED_BUILTIN on some boards
 
-#define RAM_CLK 8
+#define HALT 7
+#define RESET 8
 
-#define ADDR_WRITE 12
-#define VAL_WRITE 13
+#define ROM_DISCONNECT 9
+
+#define RAM_CLK 10
+
+#define ADDR_WRITE 11
+#define VAL_WRITE 12
 
 enum STEP {
     ADDRESS_FIRST,
@@ -24,23 +28,47 @@ enum STEP {
     COMPLETE,
 };
 
-void halt()
+void resetPinState()
 {
-    digitalWrite(HALT, HIGH);
+    // Ensure everything is default state
     digitalWrite(ROM_DISCONNECT, HIGH);
+    digitalWrite(RAM_CLK, LOW);
+    digitalWrite(ADDR_WRITE, LOW);
+    digitalWrite(VAL_WRITE, LOW);
+    digitalWrite(BUS_OUT, LOW);
+}
+
+void ensureHalted()
+{
+    digitalWrite(LED_BUILTIN, HIGH);
+
+    digitalWrite(HALT, HIGH);
+
+    resetPinState();
 }
 
 void run()
 {
+    resetPinState();
+
+    // Reset CPU
+    digitalWrite(RESET, LOW);
     digitalWrite(RESET, HIGH);
     digitalWrite(RESET, LOW);
+
+    // Start clock
     digitalWrite(HALT, LOW);
+
+    // Re-enable normal microcode execution
     digitalWrite(ROM_DISCONNECT, LOW);
+
+    digitalWrite(LED_BUILTIN, LOW);
 }
 
 void putOnBus(const uint8_t val)
 {
-    halt(); // justincase, also because I'm lazy
+    ensureHalted(); // justincase, also because I'm lazy
+
     shiftOut(SHIFT_DATA, SHIFT_CLK, MSBFIRST, val);
     digitalWrite(SHIFT_LATCH, LOW);
     digitalWrite(SHIFT_LATCH, HIGH);
@@ -72,7 +100,7 @@ void setValue(const uint8_t value)
     delay(10); // idk, justincase
     digitalWrite(RAM_CLK, LOW);
 
-    digitalWrite(ADDR_WRITE, LOW);
+    digitalWrite(VAL_WRITE, LOW);
 }
 
 static uint8_t address;
@@ -101,6 +129,7 @@ void serialEvent()
                 state = VALUE_FIRST;
                 continue;
             case 'R': // Run, reset, whatever
+                run();
             default:
                 break;
         }
@@ -156,15 +185,21 @@ void serialEvent()
 
 void setup()
 {
+    pinMode(LED_BUILTIN, OUTPUT);
+
     pinMode(SHIFT_DATA, OUTPUT);
     pinMode(SHIFT_CLK, OUTPUT);
     pinMode(SHIFT_LATCH, OUTPUT);
+
+    pinMode(BUS_OUT, OUTPUT);
 
     pinMode(HALT, OUTPUT);
     pinMode(RESET, OUTPUT);
 
     pinMode(ROM_DISCONNECT, OUTPUT);
+
     pinMode(RAM_CLK, OUTPUT);
+
     pinMode(ADDR_WRITE, OUTPUT);
     pinMode(VAL_WRITE, OUTPUT);
 
