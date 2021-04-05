@@ -177,7 +177,7 @@ void Editor::onAsmChanged()
         const QString output = parseToBinary(line, &num);
 
         // TODO: no point in trying to sync up empty lines when there isn't 1-1 mapping between lines
-        if (m_type != Type::BenEater && output.isEmpty()) {
+        if (output.isEmpty()) {
             m_outputLineNumbers.append(outputLineNum);
             continue;
         }
