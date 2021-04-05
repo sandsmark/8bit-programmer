@@ -40,6 +40,10 @@ Editor::Editor(QWidget *parent)
         {"jc",  { 0b0111, 1, "Jump to %1 if result of last calculation overflowed" }},
         {"jz",  { 0b1000, 1, "Jump to %1 if result of last calculation was zero" }},
 
+        // TODO: these are only valid for the extended, but we don't check
+        {"addi", { 0b0010, 1, "Add value %1 to content of register A (Extended only)" }},
+        {"subi", { 0b0010, 1, "Subtract value %1 from content of register A (Extended only)" }},
+
         {"out", { 0b1110, 0, "Show content of register A on display" }},
         {"hlt", { 0b1111, 0, "Halt execution" }},
     }
