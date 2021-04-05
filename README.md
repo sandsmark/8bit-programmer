@@ -1,6 +1,7 @@
-Very simple assembler for a SAP-1 CPU.
+Very simple assembler for a SAP-1 CPU, both 4 bit and 8 bit memory address width.
 
 ![screenshot](/screenshot.png)
+![screenshot of 8bit support](/screenshot-extended.png)
 
 I've never written an assembler and this is a quick 30 minutes hack, so YMMV.
 
