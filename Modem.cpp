@@ -10,6 +10,8 @@
 #include <miniaudio/miniaudio.h>
 
 
+#define BAUDS 300
+
 #define DEVICE_FORMAT       ma_format_f32
 #define DEVICE_CHANNELS     2
 #define DEVICE_SAMPLE_RATE  48000
@@ -21,6 +23,8 @@ Modem::Modem(QObject *parent) : QObject(parent)
 
 Modem::~Modem()
 {
+    std::lock_guard<std::recursive_mutex> lock(m_maMutex);
+
     if (m_device) {
         ma_device_uninit(m_device.get());
     }
@@ -55,7 +59,7 @@ bool Modem::initAudio()
                     m_device->playback.channels,
                     m_device->sampleRate,
                     ma_waveform_type_sine,
-                    m_volume,
+                    i == Silence ? 0 : m_volume,
                     frequency(Tone(i))
         );
 
@@ -63,7 +67,26 @@ bool Modem::initAudio()
         ma_waveform_init(&config, m_waveforms[i].get());
     }
 
+    m_clock.start();
+
     return true;
+}
+
+void Modem::send(const QByteArray &bytes)
+{
+    std::lock_guard<std::recursive_mutex> lock(m_maMutex);
+    const bool wasEmpty = m_sendBuffer.isEmpty();
+    m_sendBuffer.append(bytes);
+
+    if (wasEmpty && !ma_device_is_started(m_device.get())) {
+        ma_device_start(m_device.get());
+    }
+}
+
+void Modem::sendHex(const QByteArray &encoded)
+{
+    std::lock_guard<std::recursive_mutex> lock(m_maMutex);
+    send(QByteArray::fromHex(encoded));
 }
 
 #define TWO_PI (M_PI * 2.)
@@ -83,10 +106,37 @@ void Modem::generateSound(void *output, size_t bytes)
     }
 }
 
+void Modem::maybeAdvance()
+{
+    std::lock_guard<std::recursive_mutex> lock(m_maMutex);
+
+    if (m_clock.elapsed() < 1000/BAUDS) {
+        return;
+    }
+
+    m_bitNum++;
+    if (m_bitNum > 7) {
+        if (m_sendBuffer.isEmpty()) {
+            ma_device_stop(m_device.get());
+            return;
+        }
+
+        m_currentByte = m_sendBuffer[0];
+        m_sendBuffer.remove(0, 1);
+        m_bitNum = 0;
+    }
+    m_currentTone = (m_currentByte >> m_bitNum) & 0b1 ? OriginatingMark : OriginatingSpace;
+    m_bitNum++;
+}
+
 void Modem::miniaudioCallback(ma_device *device, void *output, const void *input, uint32_t frameCount)
 {
     Q_UNUSED(input);
 
     Modem *that = reinterpret_cast<Modem*>(device->pUserData);
+    std::lock_guard<std::recursive_mutex> lock(that->m_maMutex);
+
+    that->maybeAdvance();
+
     ma_waveform_read_pcm_frames(that->m_waveforms[that->m_currentTone].get(), output, frameCount);
 }

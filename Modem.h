@@ -2,7 +2,10 @@
 
 #include <QObject>
 
+#include <QElapsedTimer>
+
 #include <memory>
+#include <mutex>
 
 struct ma_device;
 struct ma_waveform;
@@ -21,10 +24,14 @@ public:
     };
     Q_ENUM(Tone)
 
-    explicit Modem(QObject *parent = nullptr);
+    explicit Modem(QObject *parent);
     ~Modem();
 
     bool initAudio();
+
+public slots:
+    void send(const QByteArray &bytes);
+    void sendHex(const QByteArray &bytes);
 
 signals:
 
@@ -35,11 +42,12 @@ private:
         case Tone::OriginatingSpace: return 1070;
         case Tone::AnsweringMark: return 2225;
         case Tone::AnsweringSpace: return 2025;
-        default: return 0;
+        default: return 440;
         }
     }
 
     void generateSound(void *output, size_t bytes);
+    void maybeAdvance();
 
     static void miniaudioCallback(ma_device* device, void *output, const void *input, uint32_t frameCount);
 
@@ -55,5 +63,10 @@ private:
     std::unique_ptr<ma_device> m_device;
     std::array<std::unique_ptr<ma_waveform>, ToneCount> m_waveforms;
     float m_volume = 0.2f;
+
+    QElapsedTimer m_clock;
+
+    // tsan doesn't support qmutex, unfortunately, so we eat the sour apple and use the ugly std APIs
+    std::recursive_mutex m_maMutex;
 };
 
