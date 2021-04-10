@@ -54,9 +54,8 @@ TODO
 ----
 
 - Demodulator part of the modem
-- User defined operators, including names, arguments, opcodes
-- Syntax highlighting
+- Configurable baud etc?
 - Better error checking (tracking where overlaps come from, missing initialization, uninitialized memory usage etc.)
-- Saving and loading.
-- The arduino part
+- User defined operators, including names, arguments, opcodes
+- Actually add buttons for saving and loading, instead of just automatic.
 
