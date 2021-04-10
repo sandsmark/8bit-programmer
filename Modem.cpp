@@ -18,6 +18,14 @@
 
 Modem::Modem(QObject *parent) : QObject(parent)
 {
+    m_maContext = std::make_unique<ma_context>();
+    ma_result ret = ma_context_init(nullptr, 0, nullptr, m_maContext.get());
+    if (ret != MA_SUCCESS) {
+        m_maContext.reset();
+        return;
+    }
+
+    connect(this, &Modem::finished, this, &Modem::stop, Qt::QueuedConnection);
 
 }
 
@@ -28,10 +36,24 @@ Modem::~Modem()
     if (m_device) {
         ma_device_uninit(m_device.get());
     }
+    if (m_maContext) {
+        ma_context_uninit(m_maContext.get());
+    }
 }
 
-bool Modem::initAudio()
+bool Modem::initAudio(const QString &deviceName)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_maMutex);
+
+    if (m_currentDevice == deviceName && m_device) {
+        return true;
+    }
+
+    if (!m_maContext) {
+        qWarning() << "No context available";
+        return false;
+    }
+
     if (m_device) {
         ma_device_uninit(m_device.get());
     }
@@ -39,6 +61,12 @@ bool Modem::initAudio()
 
     ma_device_config deviceConfig;
     deviceConfig = ma_device_config_init(ma_device_type_playback);
+
+    if (!deviceName.isEmpty() && m_devices.contains(deviceName)) {
+        deviceConfig.playback.pDeviceID = &m_devices[deviceName]->id;
+        qDebug() << "Using device" << m_devices[deviceName]->name;
+    }
+
     deviceConfig.playback.format   = DEVICE_FORMAT;
     deviceConfig.playback.channels = DEVICE_CHANNELS;
     deviceConfig.sampleRate        = DEVICE_SAMPLE_RATE;
@@ -46,7 +74,7 @@ bool Modem::initAudio()
     deviceConfig.pUserData         = this;
 
 
-    if (ma_device_init(nullptr, &deviceConfig, m_device.get()) != MA_SUCCESS) {
+    if (ma_device_init(m_maContext.get(), &deviceConfig, m_device.get()) != MA_SUCCESS) {
         qWarning() << "Failed to init device";
         return false;
     }
@@ -69,7 +97,7 @@ bool Modem::initAudio()
 
     m_clock.start();
 
-    connect(this, &Modem::finished, this, &Modem::stop, Qt::QueuedConnection);
+    m_currentDevice = deviceName;
 
     return true;
 }
@@ -77,6 +105,11 @@ bool Modem::initAudio()
 void Modem::send(const QByteArray &bytes)
 {
     std::lock_guard<std::recursive_mutex> lock(m_maMutex);
+    if (!m_device) {
+        qWarning() << "No device available, refusing to fill buffer";
+        return;
+    }
+
     const bool wasEmpty = m_sendBuffer.isEmpty();
     m_sendBuffer.append(bytes);
 
@@ -96,6 +129,39 @@ void Modem::sendHex(const QByteArray &encoded)
 void Modem::stop()
 {
     ma_device_stop(m_device.get());
+}
+
+QStringList Modem::audioOutputDevices()
+{
+    std::lock_guard<std::recursive_mutex> lock(m_maMutex);
+    m_devices.clear();
+
+    if (!m_maContext) {
+        qWarning() << "Audio not available";
+        return {};
+    }
+
+    ma_device_info* devicesInfo;
+    ma_uint32 devicesCount;
+    ma_result ret = ma_context_get_devices(m_maContext.get(), &devicesInfo, &devicesCount, nullptr, nullptr);
+    if (ret != MA_SUCCESS) {
+        qWarning() << "Failed to get list of devices";
+        return {};
+    }
+
+    QStringList list;
+    QString defaultDevice;
+    for (size_t i=0; i<devicesCount; i++) {
+        const QString name = QString::fromLocal8Bit(devicesInfo[i].name);
+        if (devicesInfo[i].isDefault) {
+            list.prepend(name);
+        } else {
+            list.append(name);
+        }
+        m_devices[name] = std::make_shared<ma_device_info>(devicesInfo[i]);
+    }
+
+    return list;
 }
 
 #define TWO_PI (M_PI * 2.)

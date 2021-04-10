@@ -91,23 +91,31 @@ Editor::Editor(QWidget *parent)
     m_serialPort = new QComboBox;
     m_serialPort->setEnabled(false);
 
-    Modem *modem = new Modem(this);
-    if (modem->initAudio()) {
-        connect(this, &Editor::sendData, modem, &Modem::sendHex);
-        uploadButton->setEnabled(true);
-        m_serialPort->addItem(s_modemName);
+    {
+        Modem *modem = new Modem(this);
+        if (modem->audioAvailable()) {
+            connect(m_serialPort, &QComboBox::currentTextChanged, modem, &Modem::setAudioDevice);
+            m_serialPort->addItems(modem->audioOutputDevices());
+            connect(this, &Editor::sendData, modem, &Modem::sendHex);
+        } else {
+            modem->deleteLater();
+        }
     }
 
     for (const QSerialPortInfo &portInfo : QSerialPortInfo::availablePorts()) {
         qDebug() << "Port:" << portInfo.portName();
         m_serialPort->addItem(portInfo.portName());
+    }
+
+    if (m_serialPort->count() > 0) {
         uploadButton->setEnabled(true);
         m_serialPort->setEnabled(true);
     }
+
     uploadLayout->addWidget(new QLabel("Memory contents:"));
     uploadLayout->addStretch();
 
-    uploadLayout->addWidget(new QLabel("Serial port:"));
+    uploadLayout->addWidget(new QLabel("Output device:"));
     uploadLayout->addWidget(m_serialPort);
     uploadLayout->addWidget(uploadButton);
 
@@ -225,6 +233,13 @@ void Editor::onUploadClicked()
     }
 
     QSerialPort serialPort(m_serialPort->currentText());
+
+    if (QSerialPortInfo(serialPort).isNull()) {
+        // TODO: hack, better selection of modem
+        emit sendData(data);
+        return;
+    }
+
     if (!serialPort.open(QIODevice::ReadWrite)) {
         QMessageBox::warning(this, "Failed top open serial port", serialPort.errorString());
         return;
