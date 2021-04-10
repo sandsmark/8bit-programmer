@@ -69,6 +69,8 @@ bool Modem::initAudio()
 
     m_clock.start();
 
+    connect(this, &Modem::finished, this, &Modem::stop, Qt::QueuedConnection);
+
     return true;
 }
 
@@ -89,6 +91,11 @@ void Modem::sendHex(const QByteArray &encoded)
 {
     std::lock_guard<std::recursive_mutex> lock(m_maMutex);
     send(QByteArray::fromHex(encoded));
+}
+
+void Modem::stop()
+{
+    ma_device_stop(m_device.get());
 }
 
 #define TWO_PI (M_PI * 2.)
@@ -119,7 +126,7 @@ void Modem::maybeAdvance()
     m_bitNum++;
     if (m_bitNum > 7) {
         if (m_sendBuffer.isEmpty()) {
-            ma_device_stop(m_device.get());
+            emit finished();
             return;
         }
 

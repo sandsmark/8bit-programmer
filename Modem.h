@@ -32,8 +32,10 @@ public:
 public slots:
     void send(const QByteArray &bytes);
     void sendHex(const QByteArray &bytes);
+    void stop();
 
 signals:
+    void finished();
 
 private:
     static inline int frequency(const Tone tone) {
