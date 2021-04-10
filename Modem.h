@@ -27,6 +27,12 @@ public:
     };
     Q_ENUM(Tone)
 
+    enum Encoding {
+        // Just one for now, hardcoded start/stop bits
+        Ascii8N1
+    };
+    Q_ENUM(Encoding)
+
     explicit Modem(QObject *parent);
     ~Modem();
 
@@ -83,5 +89,6 @@ private:
 
     QHash<QString, std::shared_ptr<ma_device_info>> m_devices;
     QString m_currentDevice;
+    Encoding m_encoding = Ascii8N1;
 };
 

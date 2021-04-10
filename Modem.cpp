@@ -190,7 +190,7 @@ void Modem::maybeAdvance()
     }
 
     m_bitNum++;
-    if (m_bitNum > 7) {
+    if (m_bitNum > 9) {
         if (m_sendBuffer.isEmpty()) {
             emit finished();
             return;
@@ -200,7 +200,29 @@ void Modem::maybeAdvance()
         m_sendBuffer.remove(0, 1);
         m_bitNum = 0;
     }
-    m_currentTone = (m_currentByte >> m_bitNum) & 0b1 ? OriginatingMark : OriginatingSpace;
+    if (m_bitNum > 8) {
+        switch(m_encoding) {
+        case Ascii8N1:
+            m_currentTone = OriginatingMark;
+            break;
+        default:
+            qWarning() << "Invalid encoding";
+            m_currentTone = OriginatingMark;
+            break;
+        }
+    } else if (m_bitNum == 0) {
+        switch(m_encoding) {
+        case Ascii8N1:
+            m_currentTone = OriginatingSpace;
+            break;
+        default:
+            qWarning() << "Invalid encoding";
+            m_currentTone = OriginatingSpace;
+            break;
+        }
+    } else {
+        m_currentTone = (m_currentByte >> (m_bitNum - 1)) & 0b1 ? OriginatingMark : OriginatingSpace;
+    }
     m_bitNum++;
 }
 
