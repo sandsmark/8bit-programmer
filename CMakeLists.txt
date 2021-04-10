@@ -26,11 +26,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets SerialPort REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets SerialPort REQUIRED)
+find_package(Threads)
 
 set(PROJECT_SOURCES
         main.cpp
         Editor.cpp
         Editor.h
+        Modem.h
+        Modem.cpp
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
@@ -49,4 +52,10 @@ else()
     endif()
 endif()
 
-target_link_libraries(beneater-programmer PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::SerialPort)
+target_link_libraries(beneater-programmer
+    PRIVATE
+        Qt${QT_VERSION_MAJOR}::Widgets
+        Qt${QT_VERSION_MAJOR}::SerialPort
+        Threads::Threads
+        ${CMAKE_DL_LIBS}
+    )
