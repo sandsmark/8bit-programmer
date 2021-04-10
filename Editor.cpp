@@ -83,6 +83,7 @@ Editor::Editor(QWidget *parent)
 
     // Uploader
     QPushButton *uploadButton = new QPushButton("Upload (F5)");
+    uploadButton->setShortcut(Qt::Key_F5);
     uploadButton->setEnabled(false); // Disabled unless there's a serial port available
 
     QHBoxLayout *uploadLayout = new QHBoxLayout;
