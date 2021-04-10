@@ -8,6 +8,7 @@
 
 class QPlainTextEdit;
 class QComboBox;
+class Modem;
 
 class SyntaxHighlighter : public QSyntaxHighlighter
 {
@@ -33,6 +34,9 @@ class Editor : public QWidget
 public:
     Editor(QWidget *parent = nullptr);
     ~Editor();
+
+signals:
+    void sendData(const QByteArray &data);
 
 private slots:
     void onTypeChanged();

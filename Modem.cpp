@@ -78,6 +78,8 @@ void Modem::send(const QByteArray &bytes)
     const bool wasEmpty = m_sendBuffer.isEmpty();
     m_sendBuffer.append(bytes);
 
+    qDebug() << "Sending" << bytes.toHex(' ');
+
     if (wasEmpty && !ma_device_is_started(m_device.get())) {
         ma_device_start(m_device.get());
     }

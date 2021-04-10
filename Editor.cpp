@@ -1,4 +1,5 @@
 #include "Editor.h"
+#include "Modem.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QPlainTextEdit>
@@ -26,6 +27,7 @@
 static const char *s_settingsKeyType = "Type";
 static const char *s_settingsValOrig = "Original";
 static const char *s_settingsValExt = "Extended";
+static const char *s_modemName = "Modem";
 
 Editor::Editor(QWidget *parent)
     : QWidget(parent),
@@ -88,6 +90,14 @@ Editor::Editor(QWidget *parent)
 
     m_serialPort = new QComboBox;
     m_serialPort->setEnabled(false);
+
+    Modem *modem = new Modem(this);
+    if (modem->initAudio()) {
+        connect(this, &Editor::sendData, modem, &Modem::sendHex);
+        uploadButton->setEnabled(true);
+        m_serialPort->addItem(s_modemName);
+    }
+
     for (const QSerialPortInfo &portInfo : QSerialPortInfo::availablePorts()) {
         qDebug() << "Port:" << portInfo.portName();
         m_serialPort->addItem(portInfo.portName());
@@ -201,8 +211,16 @@ void Editor::onUploadClicked()
 {
     // TODO: more configurable, show output received back/get feedback, async so the user can cancel
 
+    const QByteArray data = m_memContents->toPlainText().toLatin1();
+
     if (m_serialPort->currentText().isEmpty()) {
         qWarning() << "No port selected";
+        emit sendData(data);
+        return;
+    }
+
+    if (m_serialPort->currentText() == s_modemName) {
+        emit sendData(data);
         return;
     }
 
@@ -215,7 +233,7 @@ void Editor::onUploadClicked()
     serialPort.setBaudRate(57600); // TODO: configurable
 
     serialPort.write("\n");
-    serialPort.write(m_memContents->toPlainText().toLatin1());
+    serialPort.write(data);
     serialPort.write("\nR\n"); // R == run/reset/whatever
 
     if (!serialPort.waitForBytesWritten(1000)) {
