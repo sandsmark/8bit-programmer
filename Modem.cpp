@@ -71,29 +71,28 @@ bool Modem::initAudio(const QString &deviceName)
     deviceConfig.playback.channels = DEVICE_CHANNELS;
     deviceConfig.sampleRate        = DEVICE_SAMPLE_RATE;
     deviceConfig.dataCallback      = &Modem::miniaudioCallback;
+    deviceConfig.performanceProfile = ma_performance_profile_low_latency;
+    deviceConfig.periodSizeInMilliseconds = 1;
     deviceConfig.pUserData         = this;
-
 
     if (ma_device_init(m_maContext.get(), &deviceConfig, m_device.get()) != MA_SUCCESS) {
         qWarning() << "Failed to init device";
         return false;
     }
+
     qDebug() << "Got device" << m_device->playback.name;
 
+    ma_waveform_config config = ma_waveform_config_init(
+                m_device->playback.format,
+                m_device->playback.channels,
+                m_device->sampleRate,
+                ma_waveform_type_sine,
+                m_volume,
+                frequency(OriginatingMark)
+                );
 
-    for (int i=0; i<ToneCount; i++) {
-        ma_waveform_config config = ma_waveform_config_init(
-                    m_device->playback.format,
-                    m_device->playback.channels,
-                    m_device->sampleRate,
-                    ma_waveform_type_sine,
-                    i == Silence ? 0 : m_volume,
-                    frequency(Tone(i))
-        );
-
-        m_waveforms[i] = std::make_unique<ma_waveform>();
-        ma_waveform_init(&config, m_waveforms[i].get());
-    }
+    m_waveform = std::make_unique<ma_waveform>();
+    ma_waveform_init(&config, m_waveform.get());
 
     m_clock.start();
 
@@ -116,6 +115,7 @@ void Modem::send(const QByteArray &bytes)
     qDebug() << "Sending" << bytes.toHex(' ');
 
     if (wasEmpty && !ma_device_is_started(m_device.get())) {
+        m_currentTone = Silence;
         ma_device_start(m_device.get());
     }
 }
@@ -185,13 +185,17 @@ void Modem::maybeAdvance()
 {
     std::lock_guard<std::recursive_mutex> lock(m_maMutex);
 
-    if (m_clock.elapsed() < 1000/BAUDS) {
+    const int msecElapsed = qRound(m_clock.nsecsElapsed()/(1000.f * 100.f) + 1);
+    if (msecElapsed < 10 * 1000/BAUDS) {
         return;
     }
+//    qDebug() << m_clock.nsecsElapsed()/(1000. * 1000.);
+    m_clock.restart();
 
-    m_bitNum++;
     if (m_bitNum > 9) {
         if (m_sendBuffer.isEmpty()) {
+            m_currentTone = Silence;
+            ma_waveform_set_amplitude(m_waveform.get(), 0);
             emit finished();
             return;
         }
@@ -223,6 +227,8 @@ void Modem::maybeAdvance()
     } else {
         m_currentTone = (m_currentByte >> (m_bitNum - 1)) & 0b1 ? OriginatingMark : OriginatingSpace;
     }
+    ma_waveform_set_frequency(m_waveform.get(), frequency(m_currentTone));
+//    qDebug() << m_sendBuffer.count() << m_bitNum << m_currentTone;
     m_bitNum++;
 }
 
@@ -235,5 +241,10 @@ void Modem::miniaudioCallback(ma_device *device, void *output, const void *input
 
     that->maybeAdvance();
 
-    ma_waveform_read_pcm_frames(that->m_waveforms[that->m_currentTone].get(), output, frameCount);
+    if (that->m_currentTone == Silence) {
+        ma_waveform_set_amplitude(that->m_waveform.get(), 0);
+    } else {
+        ma_waveform_set_amplitude(that->m_waveform.get(), that->m_volume);
+    }
+    ma_waveform_read_pcm_frames(that->m_waveform.get(), output, frameCount);
 }

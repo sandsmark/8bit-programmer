@@ -59,7 +59,7 @@ private:
         case Tone::OriginatingSpace: return 1070;
         case Tone::AnsweringMark: return 2225;
         case Tone::AnsweringSpace: return 2025;
-        default: return 440;
+        default: return 1270; // Mark default when no signal
         }
     }
 
@@ -79,7 +79,7 @@ private:
 
     std::unique_ptr<ma_context> m_maContext;
     std::unique_ptr<ma_device> m_device;
-    std::array<std::unique_ptr<ma_waveform>, ToneCount> m_waveforms;
+    std::unique_ptr<ma_waveform> m_waveform;
     float m_volume = 0.2f;
 
     QElapsedTimer m_clock;

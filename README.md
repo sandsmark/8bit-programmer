@@ -53,6 +53,7 @@ TODO
 ----
 
 - Demodulator part of the modem
+- Generate audio output up front, not on the fly. miniaudio can't keep up with our baud rate.
 - Configurable baud etc?
 - Better error checking (tracking where overlaps come from, missing initialization, uninitialized memory usage etc.)
 - User defined operators, including names, arguments, opcodes
