@@ -63,8 +63,9 @@ private:
         }
     }
 
-    void generateSound(void *output, size_t bytes);
+    void generateSound(float *output, size_t frames);
     void maybeAdvance();
+    bool advance();
 
     static void miniaudioCallback(ma_device* device, void *output, const void *input, uint32_t frameCount);
 
@@ -73,7 +74,7 @@ private:
     uint8_t m_bitNum = 0;
 
     int m_sampleRate = 44100;
-    uint32_t m_timeIndex = 0; // idk should do math so it doesn't wrap randomly
+    double m_time = 0.; // idk should do math so it doesn't wrap randomly
 
     Tone m_currentTone = Silence;
 
@@ -90,5 +91,7 @@ private:
     QHash<QString, std::shared_ptr<ma_device_info>> m_devices;
     QString m_currentDevice;
     Encoding m_encoding = Ascii8N1;
+
+    QVector<float> m_audio;
 };
 
