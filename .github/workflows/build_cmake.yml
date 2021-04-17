@@ -76,7 +76,7 @@ jobs:
 
     - uses: ncipollo/release-action@v1
       with:
-        artifacts: 8bit-programmer-${{ env.GITHUB_RUN_NUMBER }}.zip
+        artifacts: "8bit-programmer-*.zip"
         token: ${{ secrets.GITHUB_TOKEN }}
         tag: 1
         allowUpdates: true
