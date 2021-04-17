@@ -69,6 +69,7 @@ jobs:
         copy "%Qt5_Dir%\bin\Qt5Core.dll" 8bit-programmer
         copy "%Qt5_Dir%\bin\Qt5Gui.dll" 8bit-programmer
         copy "%Qt5_Dir%\bin\Qt5Widgets.dll" 8bit-programmer
+        copy "%Qt5_Dir%\bin\Qt5SerialPort.dll" 8bit-programmer
         mkdir 8bit-programmer\platforms
         copy "%Qt5_Dir%\plugins\platforms\qwindows.dll" 8bit-programmer\platforms
         7z a 8bit-programmer-%GITHUB_RUN_NUMBER%.zip 8bit-programmer\*
