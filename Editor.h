@@ -4,10 +4,37 @@
 #include <QHash>
 #include <QMap>
 #include <QSyntaxHighlighter>
+#include <QDebug>
 
+#include <QComboBox>
+
+class BaudEdit : public QComboBox
+{
+    Q_OBJECT
+
+
+protected:
+    void focusOutEvent(QFocusEvent *event) override {
+        if (event->reason() != Qt::ActiveWindowFocusReason) {
+            emit textActivated(currentText());
+        }
+
+
+        QComboBox::focusOutEvent(event);
+    }
+    void keyPressEvent(QKeyEvent *event) override {
+        if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+            clearFocus();
+            return;
+        }
+        QComboBox::keyPressEvent(event);
+    }
+};
 
 class QPlainTextEdit;
 class QComboBox;
+class QHBoxLayout;
+class QSpinBox;
 class Modem;
 
 class SyntaxHighlighter : public QSyntaxHighlighter
@@ -45,8 +72,13 @@ private slots:
     bool save();
     void onScrolled();
     void onCursorMoved();
+    void setSettingsVisible(bool visible);
+    void onOutputChanged(const QString &outputName);
+    void onBaudChanged(QString baudString);
+    void onFrequencyChanged();
 
 private:
+    static bool isSerialPort(const QString &name);
     bool loadFile(const QString &path);
     void saveAs();
 
@@ -80,4 +112,12 @@ private:
     QString m_currentFile;
 
     Type m_type = Type::BenEater;
+
+    QComboBox *m_baudSelect;
+    QHBoxLayout *m_settingsLayout;
+
+    QSpinBox *m_spaceFreq;
+    QSpinBox *m_markFreq;
+
+    Modem *m_modem;
 };

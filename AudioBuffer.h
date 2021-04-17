@@ -20,6 +20,9 @@ struct AudioBuffer
     int sampleRate = 44100;
     int baud = 300;
 
+    int spaceFrequency = 2025;
+    int markFrequency = 2225;
+
 private:
     enum Tone {
         OriginatingMark,
@@ -30,12 +33,12 @@ private:
         ToneCount
     };
 
-    static inline int frequency(const Tone tone) {
+    inline int frequency(const Tone tone) {
         switch(tone) {
         case Tone::OriginatingMark: return 1270;
         case Tone::OriginatingSpace: return 1070;
-        case Tone::AnsweringMark: return 2225;
-        case Tone::AnsweringSpace: return 2025;
+        case Tone::AnsweringMark: return spaceFrequency;//2225;
+        case Tone::AnsweringSpace: return markFrequency;//2025;
         default: return 1270; // Mark default when no signal
         }
     }

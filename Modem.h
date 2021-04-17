@@ -29,6 +29,10 @@ public:
 
     QStringList audioOutputDevices();
 
+    void setBaud(const int baud);
+    void setSampleRate(const int rate);
+    void setFrequencies(const int space, const int mark);
+
 public slots:
     void send(const QByteArray &bytes);
     void sendHex(const QByteArray &bytes);
@@ -39,6 +43,7 @@ signals:
     void finished();
 
 private:
+    void updateAudioDevices();
 
     static void miniaudioCallback(ma_device* device, void *output, const void *input, uint32_t frameCount);
 
@@ -57,5 +62,6 @@ private:
 
     std::unique_ptr<AudioBuffer> m_buffer;
 
+    QStringList m_outputDeviceList;
 };
 

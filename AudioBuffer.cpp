@@ -6,6 +6,7 @@
 
 void AudioBuffer::appendBytes(const QByteArray &bytes)
 {
+    qDebug() << markFrequency << spaceFrequency;
     m_sendBuffer.append(bytes);
 
     qDebug() << "Sending" << bytes.toHex(' ');
@@ -62,25 +63,25 @@ bool AudioBuffer::advance()
     if (m_bitNum > 8) {
         switch(m_encoding) {
         case Ascii8N1:
-            m_currentTone = OriginatingMark;
+            m_currentTone = AnsweringMark;
             break;
         default:
             qWarning() << "Invalid encoding";
-            m_currentTone = OriginatingMark;
+            m_currentTone = AnsweringMark;
             break;
         }
     } else if (m_bitNum == 0) {
         switch(m_encoding) {
         case Ascii8N1:
-            m_currentTone = OriginatingSpace;
+            m_currentTone = AnsweringSpace;
             break;
         default:
             qWarning() << "Invalid encoding";
-            m_currentTone = OriginatingSpace;
+            m_currentTone = AnsweringSpace;
             break;
         }
     } else {
-        m_currentTone = (m_currentByte >> (m_bitNum - 1)) & 0b1 ? OriginatingMark : OriginatingSpace;
+        m_currentTone = (m_currentByte >> (m_bitNum - 1)) & 0b1 ? AnsweringMark : AnsweringSpace;
     }
     //qDebug() << m_sendBuffer.count() << m_bitNum << m_currentTone;
     m_bitNum++;

@@ -11,7 +11,8 @@
 
 #define DEVICE_FORMAT       ma_format_f32
 #define DEVICE_CHANNELS     1
-#define DEVICE_SAMPLE_RATE  48000
+#define DEVICE_SAMPLE_RATE 41000
+//#define DEVICE_SAMPLE_RATE  48000
 
 Modem::Modem(QObject *parent) : QObject(parent)
 {
@@ -22,6 +23,7 @@ Modem::Modem(QObject *parent) : QObject(parent)
         m_maContext.reset();
         return;
     }
+    updateAudioDevices();
 
     connect(this, &Modem::finished, this, &Modem::stop, Qt::QueuedConnection);
 }
@@ -115,12 +117,20 @@ void Modem::stop()
 
 QStringList Modem::audioOutputDevices()
 {
+    return m_outputDeviceList;
+}
+
+void Modem::updateAudioDevices()
+{
+    // Can only run from one thread, and cannot be run while audio is playing
+
     std::lock_guard<std::recursive_mutex> lock(m_maMutex);
     m_devices.clear();
+    m_outputDeviceList.clear();
 
     if (!m_maContext) {
         qWarning() << "Audio not available";
-        return {};
+        return;
     }
 
     ma_device_info* devicesInfo;
@@ -128,22 +138,38 @@ QStringList Modem::audioOutputDevices()
     ma_result ret = ma_context_get_devices(m_maContext.get(), &devicesInfo, &devicesCount, nullptr, nullptr);
     if (ret != MA_SUCCESS) {
         qWarning() << "Failed to get list of devices";
-        return {};
+        return;
     }
 
-    QStringList list;
     QString defaultDevice;
     for (size_t i=0; i<devicesCount; i++) {
         const QString name = QString::fromLocal8Bit(devicesInfo[i].name);
         if (devicesInfo[i].isDefault) {
-            list.prepend(name);
+            m_outputDeviceList.prepend(name);
         } else {
-            list.append(name);
+            m_outputDeviceList.append(name);
         }
         m_devices[name] = std::make_shared<ma_device_info>(devicesInfo[i]);
     }
+}
 
-    return list;
+void Modem::setBaud(const int baud)
+{
+    if (baud <= 0) {
+        return;
+    }
+    m_buffer->baud = baud;
+}
+
+void Modem::setSampleRate(const int /*rate*/)
+{
+    // TODO, need to validate and shit
+}
+
+void Modem::setFrequencies(const int space, const int mark)
+{
+    m_buffer->spaceFrequency = space;
+    m_buffer->markFrequency = mark;
 }
 
 void Modem::miniaudioCallback(ma_device *device, void *output, const void *input, uint32_t frameCount)

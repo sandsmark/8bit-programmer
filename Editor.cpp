@@ -21,6 +21,7 @@
 #include <QTimer>
 #include <QFileDialog>
 #include <QTextBlock>
+#include <QSpinBox>
 
 #include <QtMath>
 
@@ -28,6 +29,15 @@ static const char *s_settingsKeyType = "Type";
 static const char *s_settingsValOrig = "Original";
 static const char *s_settingsValExt = "Extended";
 static const char *s_modemName = "Modem";
+
+bool Editor::isSerialPort(const QString &name)
+{
+    if (name.isEmpty()) {
+        return false;
+    }
+    QSerialPort serialPort(name);
+    return !QSerialPortInfo(serialPort).isNull();
+}
 
 Editor::Editor(QWidget *parent)
     : QWidget(parent),
@@ -92,16 +102,19 @@ Editor::Editor(QWidget *parent)
     m_serialPort = new QComboBox;
     m_serialPort->setEnabled(false);
 
+    m_modem = new Modem(this);
     {
-        Modem *modem = new Modem(this);
-        if (modem->audioAvailable()) {
-            connect(m_serialPort, &QComboBox::currentTextChanged, modem, &Modem::setAudioDevice);
-            m_serialPort->addItems(modem->audioOutputDevices());
-            connect(this, &Editor::sendData, modem, &Modem::sendHex);
+        if (m_modem->audioAvailable()) {
+            connect(m_serialPort, &QComboBox::currentTextChanged, m_modem, &Modem::setAudioDevice);
+            m_serialPort->addItems(m_modem->audioOutputDevices());
+            connect(this, &Editor::sendData, m_modem, &Modem::sendHex);
         } else {
-            modem->deleteLater();
+            m_modem->deleteLater();
         }
     }
+
+    QPushButton *settingsButton = new QPushButton(tr("Settings"));
+    settingsButton->setCheckable(true);
 
     for (const QSerialPortInfo &portInfo : QSerialPortInfo::availablePorts()) {
         qDebug() << "Port:" << portInfo.portName();
@@ -112,13 +125,53 @@ Editor::Editor(QWidget *parent)
         uploadButton->setEnabled(true);
         m_serialPort->setEnabled(true);
     }
+    m_serialPort->setFixedWidth(200);
 
     uploadLayout->addWidget(new QLabel("Memory contents:"));
     uploadLayout->addStretch();
 
+    uploadLayout->addWidget(uploadButton);
+    uploadLayout->addStretch();
+
     uploadLayout->addWidget(new QLabel("Output device:"));
     uploadLayout->addWidget(m_serialPort);
-    uploadLayout->addWidget(uploadButton);
+    uploadLayout->addWidget(settingsButton);
+
+    m_settingsLayout = new QHBoxLayout;
+    mainLayout->addLayout(m_settingsLayout);
+
+    m_markFreq = new QSpinBox;
+    m_markFreq->setMaximum(30000);
+    m_markFreq->setMinimum(1);
+    m_markFreq->setSuffix(" Hz");
+    m_markFreq->setSingleStep(5);
+    m_spaceFreq = new QSpinBox;
+    m_spaceFreq->setMaximum(30000);
+    m_spaceFreq->setMinimum(1);
+    m_spaceFreq->setSingleStep(5);
+    m_spaceFreq->setSuffix(" Hz");
+    m_settingsLayout->addWidget(new QLabel(tr("Space (0):")));
+    m_settingsLayout->addWidget(m_spaceFreq);
+    m_settingsLayout->addWidget(new QLabel(tr("Mark (1):")));
+    m_settingsLayout->addWidget(m_markFreq);
+    m_settingsLayout->addStretch();
+
+
+    m_baudSelect = new BaudEdit();
+
+    m_baudSelect->setEditable(true);
+    m_baudSelect->setValidator(new QIntValidator(1, 256000));
+    m_baudSelect->addItems({
+        "110",
+        "300",
+        "1200",
+        "9600",
+        "19200",
+        "57600",
+        "115200",
+    });
+    m_settingsLayout->addWidget(new QLabel(tr("Baud:")));
+    m_settingsLayout->addWidget(m_baudSelect);
 
     QHBoxLayout *uploadBottomLayout = new QHBoxLayout;
     mainLayout->addLayout(uploadBottomLayout);
@@ -132,14 +185,18 @@ Editor::Editor(QWidget *parent)
     m_serialOutput->setPlaceholderText("Serial response");
     uploadBottomLayout->addWidget(m_serialOutput);
 
-    connect(uploadButton, &QPushButton::clicked, this, &Editor::onUploadClicked);
-    connect(m_asmEdit->verticalScrollBar(), &QScrollBar::valueChanged, this, &Editor::onScrolled);
-    connect(m_asmEdit, &QPlainTextEdit::textChanged, this, &Editor::onAsmChanged);
-    connect(m_asmEdit, &QPlainTextEdit::cursorPositionChanged, this, &Editor::onCursorMoved);
-    connect(m_typeDropdown, &QComboBox::currentTextChanged, this, &Editor::onTypeChanged); // meh, use currenttext because the other is overloaded
-
     QSettings settings;
     loadFile(settings.value("lastOpenedFile").toString());
+    const QString lastOutputDevice = settings.value("lastOutputDevice").toString();
+    if (isSerialPort(lastOutputDevice) || m_modem->audioOutputDevices().contains(lastOutputDevice)) {
+        m_serialPort->setCurrentText(lastOutputDevice);
+    }
+    if (isSerialPort(m_serialPort->currentText())) {
+        m_baudSelect->setCurrentText(QString::number(settings.value("serialBaudRate", 115200).toInt()));
+    } else if (m_modem->audioAvailable()) {
+        m_baudSelect->setCurrentText(QString::number(settings.value("modemBaudRate", 300).toInt()));
+        m_modem->setBaud(m_baudSelect->currentText().toInt());
+    }
 
     const QString lastType = settings.value(s_settingsKeyType).toString();
     if (lastType == s_settingsValExt) {
@@ -148,12 +205,37 @@ Editor::Editor(QWidget *parent)
     } else {
         m_type = Type::BenEater;
     }
+    int markFreq = settings.value("markFreq", 0).toInt();
+    if (markFreq <= 0) {
+        markFreq = 2225;
+    }
+    qDebug() << "loaded" << markFreq;
+    m_markFreq->setValue(markFreq);
+    int spaceFreq = settings.value("spaceFreq", 0).toInt();
+    if (spaceFreq <= 0) {
+       spaceFreq = 2025;
+    }
+    qDebug() << "Loaded" << spaceFreq;
+    m_spaceFreq->setValue(spaceFreq);
+    m_modem->setFrequencies(spaceFreq, markFreq);
 
     QTimer *timer = new QTimer(this);
     timer->setSingleShot(true);
     connect(timer, &QTimer::timeout, this, &Editor::save);
     timer->setInterval(500);
     connect(m_asmEdit, &QPlainTextEdit::textChanged, timer, [timer]() { timer->start(); });
+
+    connect(uploadButton, &QPushButton::clicked, this, &Editor::onUploadClicked);
+    connect(settingsButton, &QPushButton::clicked, this, &Editor::setSettingsVisible);
+    connect(m_asmEdit->verticalScrollBar(), &QScrollBar::valueChanged, this, &Editor::onScrolled);
+    connect(m_asmEdit, &QPlainTextEdit::textChanged, this, &Editor::onAsmChanged);
+    connect(m_asmEdit, &QPlainTextEdit::cursorPositionChanged, this, &Editor::onCursorMoved);
+    connect(m_typeDropdown, &QComboBox::currentTextChanged, this, &Editor::onTypeChanged); // meh, use currenttext because the other is overloaded
+    connect(m_baudSelect, &QComboBox::textActivated, this, &Editor::onBaudChanged); // meh, use currenttext because the other is overloaded
+    connect(m_spaceFreq, &QSpinBox::textChanged, this, &Editor::onFrequencyChanged); // valueChanged is fucked because wtf qt
+    connect(m_markFreq, &QSpinBox::textChanged, this, &Editor::onFrequencyChanged); // valueChanged is fucked because wtf qt
+
+    setSettingsVisible(false);
 }
 
 Editor::~Editor()
@@ -222,31 +304,19 @@ void Editor::onUploadClicked()
 
     const QByteArray data = m_memContents->toPlainText().toLatin1();
 
-    if (m_serialPort->currentText().isEmpty()) {
-        qWarning() << "No port selected";
-        emit sendData(data);
-        return;
-    }
-
-    if (m_serialPort->currentText() == s_modemName) {
+    if (!isSerialPort(m_serialPort->currentText())) {
         emit sendData(data);
         return;
     }
 
     QSerialPort serialPort(m_serialPort->currentText());
-
-    if (QSerialPortInfo(serialPort).isNull()) {
-        // TODO: hack, better selection of modem
-        emit sendData(data);
-        return;
-    }
+    serialPort.setBaudRate(m_baudSelect->currentText().toInt());
 
     if (!serialPort.open(QIODevice::ReadWrite)) {
         QMessageBox::warning(this, "Failed top open serial port", serialPort.errorString());
         return;
     }
 
-    serialPort.setBaudRate(57600); // TODO: configurable
 
     serialPort.write("\n");
     serialPort.write(data);
@@ -355,7 +425,82 @@ void Editor::onCursorMoved()
 
     highlightOutput(startLine, endLine);
     m_binOutput->ensureCursorVisible();
-//    m_binOutput->verticalScrollBar()->setValue(startLine);
+    //    m_binOutput->verticalScrollBar()->setValue(startLine);
+}
+
+void Editor::setSettingsVisible(bool visible)
+{
+    for (int i=0; i<m_settingsLayout->count(); i++) {
+        QWidget *widget = m_settingsLayout->itemAt(i)->widget();
+        if (!widget) {
+            continue;
+        }
+        widget->setVisible(visible);
+    }
+    if (visible && m_modem->audioOutputDevices().contains(m_serialPort->currentText())) {
+        m_spaceFreq->setEnabled(true);
+        m_markFreq->setEnabled(true);
+    } else {
+        m_spaceFreq->setEnabled(false);
+        m_markFreq->setEnabled(false);
+    }
+}
+
+void Editor::onOutputChanged(const QString &outputName)
+{
+    qDebug() << outputName;
+    QSettings settings;
+    settings.setValue("lastOutputDevice", outputName);
+
+    if (isSerialPort(m_serialPort->currentText())) {
+        m_baudSelect->setCurrentText(QString::number(settings.value("serialBaudRate", 115200).toInt()));
+    } else if (m_modem->audioAvailable()) {
+        m_baudSelect->setCurrentText(QString::number(settings.value("modemBaudRate", 300).toInt()));
+    }
+
+}
+
+void Editor::onBaudChanged(QString baudString)
+{
+    qDebug() << "baud" << baudString << m_baudSelect->hasFocus();
+    int unused;
+    if (m_baudSelect->validator()->validate(baudString, unused) != QValidator::Acceptable) {
+        m_baudSelect->setCurrentText("300");
+    }
+
+    bool ok;
+    int baud = baudString.toInt(&ok);
+    if (!ok || baud <= 0) {
+        m_baudSelect->setCurrentIndex(0);
+        return;
+    }
+
+    QSettings settings;
+
+    if (isSerialPort(m_serialPort->currentText())) {
+        settings.setValue("serialBaudRate", baud);
+    } else if (m_modem->audioOutputDevices().contains(m_serialPort->currentText())) {
+        settings.setValue("modemBaudRate", baud);
+        m_modem->setBaud(baud);
+    }
+}
+
+void Editor::onFrequencyChanged()
+{
+    const int space = m_spaceFreq->value();
+    if (space <= 0) {
+        return;
+    }
+    const int mark = m_markFreq->value();
+    if (mark <= 0) {
+        return;
+    }
+    m_modem->setFrequencies(space, mark);
+
+    QSettings settings;
+    settings.setValue("spaceFreq", space);
+    settings.setValue("markFreq", mark);
+
 }
 
 void Editor::scrollOutputTo(const int line)
