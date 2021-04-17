@@ -80,5 +80,6 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: 8bit-programmer.zip
+        tag_name: wintendo-${{ env.GITHUB_RUN_NUMBER }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
