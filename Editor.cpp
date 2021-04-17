@@ -79,7 +79,7 @@ Editor::Editor(QWidget *parent)
     topLayout->addWidget(new QLabel("CPU Type:"));
 
     m_typeDropdown = new QComboBox;
-    m_typeDropdown->addItems({"Original Ben Eater (4 bit memory)", "Extended (8 bit memory"});
+    m_typeDropdown->addItems({"Original Ben Eater (4 bit memory)", "Extended (8 bit memory)"});
     topLayout->addWidget(m_typeDropdown);
 
     QHBoxLayout *editorLayout = new QHBoxLayout;
