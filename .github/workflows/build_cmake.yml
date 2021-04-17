@@ -27,6 +27,7 @@ jobs:
       uses: ilammy/msvc-dev-cmd@v1
       with:
         toolset: 14.0
+        arch: win32
 
     - name: Cache Qt
       id: cache-qt
