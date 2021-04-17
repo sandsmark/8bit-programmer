@@ -20,6 +20,13 @@ without cheating. USB is too complex to implement on a breadboard, and the only
 other output I have on my laptop is the headphone jack.
 
 
+Downloads
+---------
+
+Windows builds can be found here, just download the zip file with the highest number:
+
+https://github.com/sandsmark/8bit-programmer/releases/tag/1
+
 Modem
 -----
 
