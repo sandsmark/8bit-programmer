@@ -56,8 +56,9 @@ jobs:
         git tag wintendo-%GITHUB_RUN_NUMBER%
         mkdir 8bit-programmer
         move Release\8bit-programmer.exe 8bit-programmer\
-        copy "%VCINSTALLDIR%\redist\msvc\14.28.29910\x86\Microsoft.VC142.CRT\msvcp140.dll" 8bit-programmer
-        copy "%VCINSTALLDIR%\redist\msvc\14.28.29910\x86\Microsoft.VC142.CRT\msvcp140.dll" 8bit-programmer
+        @echo on
+        echo "%VCINSTALLDIR%\redist\msvc\14.28.29910\x86\Microsoft.VC142.CRT\msvcp140.dll"
+        copy "%VCINSTALLDIR%\redist\msvc\14.28.29910\x86\Microsoft.VC142.CRT\vcruntime140.dll" 8bit-programmer
         copy "%VCINSTALLDIR%\redist\msvc\14.28.29910\x86\Microsoft.VC142.CRT\vcruntime140.dll" 8bit-programmer
         copy "%QTDIR%\bin\Qt5Core.dll" 8bit-programmer
         copy "%QTDIR%\bin\Qt5Gui.dll" 8bit-programmer
