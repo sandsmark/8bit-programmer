@@ -73,12 +73,12 @@ jobs:
         copy "%Qt5_Dir%\bin\Qt5Widgets.dll" 8bit-programmer
         mkdir 8bit-programmer\platforms
         copy "%Qt5_Dir%\plugins\platforms\qwindows.dll" 8bit-programmer\platforms
-        7z a 8bit-programmer.zip 8bit-programmer\*
+        7z a 8bit-programmer-%GITHUB_RUN_NUMBER%.zip 8bit-programmer\*
 
     - name: Upload result
       uses: softprops/action-gh-release@v1
       with:
-        files: 8bit-programmer.zip
+        files: 8bit-programmer-${{ env.GITHUB_RUN_NUMBER }}.zip
         tag_name: 1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
