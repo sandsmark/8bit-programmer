@@ -34,6 +34,8 @@ set(PROJECT_SOURCES
         Editor.h
         Modem.h
         Modem.cpp
+
+        MiniAudio_impl.cpp
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
