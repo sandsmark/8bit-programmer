@@ -47,7 +47,7 @@ jobs:
     - name: Build
       shell: bash
       # Execute the build.  You can specify a specific target with "--target <NAME>"
-      run: cmake --build .
+      run: cmake --build --config Release .
 
     - name: Package
       # Execute the build.  You can specify a specific target with "--target <NAME>"
@@ -55,9 +55,9 @@ jobs:
         git tag wintendo-${{ env.GITHUB_RUN_NUMBER }}
         mkdir 8bit-programmer
         move Release\8bit-programmer.exe 8bit-programmer\
-        copy "%VCINSTALLDIR%\redist\msvc\14.28.29325\x86\Microsoft.VC142.CRT\msvcp140.dll" 8bit-programmer
-        copy "%VCINSTALLDIR%\redist\msvc\14.28.29325\x86\Microsoft.VC142.CRT\msvcp140.dll" 8bit-programmer
-        copy "%VCINSTALLDIR%\redist\msvc\14.28.29325\x86\Microsoft.VC142.CRT\vcruntime140.dll" 8bit-programmer
+        copy "%VCINSTALLDIR%\redist\msvc\14.28.29910\x86\Microsoft.VC142.CRT\msvcp140.dll" 8bit-programmer
+        copy "%VCINSTALLDIR%\redist\msvc\14.28.29910\x86\Microsoft.VC142.CRT\msvcp140.dll" 8bit-programmer
+        copy "%VCINSTALLDIR%\redist\msvc\14.28.29910\x86\Microsoft.VC142.CRT\vcruntime140.dll" 8bit-programmer
         copy "%QTDIR%\bin\Qt5Core.dll" 8bit-programmer
         copy "%QTDIR%\bin\Qt5Gui.dll" 8bit-programmer
         copy "%QTDIR%\bin\Qt5Widgets.dll" 8bit-programmer
