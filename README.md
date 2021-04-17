@@ -1,4 +1,4 @@
-Very simple assembler for a SAP-1 CPU, both 4 bit and 8 bit memory address width.
+Very simple assembler for a [SAP-1](https://www.amazon.com/Digital-Computer-Electronics-Albert-Malvino/dp/0028005945) CPU, both 4 bit and 8 bit memory address width.
 
 Also includes very rudimentary modem support, to upload via a soundcard instead
 of cheating by relying on an e. g. an Arduino that is a gazillion times as
