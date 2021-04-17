@@ -34,6 +34,8 @@ set(PROJECT_SOURCES
         Editor.h
         Modem.h
         Modem.cpp
+        AudioBuffer.cpp
+        AudioBuffer.h
 
         MiniAudio_impl.cpp
 )

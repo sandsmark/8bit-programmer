@@ -1,15 +1,13 @@
 #include "Modem.h"
 
-#include <QDebug>
+#include "AudioBuffer.h"
 
-#include <cmath>
+#include <QDebug>
 
 #define MA_NO_JACK
 #define MA_NO_SDL
 #define MA_NO_OPENAL
 #include <miniaudio/miniaudio.h>
-
-#define BAUDS 300
 
 #define DEVICE_FORMAT       ma_format_f32
 #define DEVICE_CHANNELS     1
@@ -17,6 +15,7 @@
 
 Modem::Modem(QObject *parent) : QObject(parent)
 {
+    m_buffer = std::make_unique<AudioBuffer>();
     m_maContext = std::make_unique<ma_context>();
     ma_result ret = ma_context_init(nullptr, 0, nullptr, m_maContext.get());
     if (ret != MA_SUCCESS) {
@@ -76,7 +75,7 @@ bool Modem::initAudio(const QString &deviceName)
         return false;
     }
 
-    m_buffer.m_sampleRate = deviceConfig.sampleRate;
+    m_buffer->sampleRate = deviceConfig.sampleRate;
 
     qDebug() << "Got device" << m_device->playback.name;
 
@@ -94,38 +93,11 @@ void Modem::send(const QByteArray &bytes)
         return;
     }
 
-    const bool wasEmpty = m_buffer.isEmpty();
-    m_buffer.appendBytes(bytes);
+    const bool wasEmpty = m_buffer->isEmpty();
+    m_buffer->appendBytes(bytes);
 
     if (wasEmpty && !ma_device_is_started(m_device.get())) {
         ma_device_start(m_device.get());
-    }
-}
-
-void AudioBuffer::appendBytes(const QByteArray &bytes)
-{
-    m_sendBuffer.append(bytes);
-
-    qDebug() << "Sending" << bytes.toHex(' ');
-
-    const int framesPerBit = m_sampleRate / BAUDS; // idklol, i think this is right
-    QVector<float> newAudio(m_sendBuffer.count() * 10 * framesPerBit);
-
-    m_bitNum = 10; // im lazy, > 9 makes advance() take the next byte
-    m_time = 0.;
-    for (int i=0; i<newAudio.size(); i += framesPerBit) {
-        if (!advance()) {
-            qWarning() << "audio buffer too big" << i;
-            break;
-        }
-        generateSound(&newAudio.data()[i], framesPerBit);
-    }
-
-    m_audio.append(newAudio);
-
-    if (!m_sendBuffer.isEmpty()) {
-        qWarning() << "Audio buffer too small";
-        qDebug() << m_sendBuffer.size() << m_audio.size();
     }
 }
 
@@ -174,62 +146,6 @@ QStringList Modem::audioOutputDevices()
     return list;
 }
 
-#define TWO_PI (M_PI * 2.)
-
-void AudioBuffer::generateSound(float *output, size_t frames)
-{
-    const int freq = frequency(m_currentTone);
-    if (!freq || ! m_sampleRate) {
-        return;
-    }
-    const double advance = double(freq) / m_sampleRate;
-    for (size_t i=0; i<frames; i++) {
-        output[i] = sin(TWO_PI * m_time);
-        m_time += advance;
-    }
-}
-
-bool AudioBuffer::advance()
-{
-    if (m_bitNum > 9) {
-        if (m_sendBuffer.isEmpty()) {
-            qDebug() << "Finito";
-            return false;
-        }
-
-        m_currentByte = m_sendBuffer[0];
-        m_sendBuffer.remove(0, 1);
-        m_bitNum = 0;
-    }
-
-    if (m_bitNum > 8) {
-        switch(m_encoding) {
-        case Ascii8N1:
-            m_currentTone = OriginatingMark;
-            break;
-        default:
-            qWarning() << "Invalid encoding";
-            m_currentTone = OriginatingMark;
-            break;
-        }
-    } else if (m_bitNum == 0) {
-        switch(m_encoding) {
-        case Ascii8N1:
-            m_currentTone = OriginatingSpace;
-            break;
-        default:
-            qWarning() << "Invalid encoding";
-            m_currentTone = OriginatingSpace;
-            break;
-        }
-    } else {
-        m_currentTone = (m_currentByte >> (m_bitNum - 1)) & 0b1 ? OriginatingMark : OriginatingSpace;
-    }
-    //qDebug() << m_sendBuffer.count() << m_bitNum << m_currentTone;
-    m_bitNum++;
-    return true;
-}
-
 void Modem::miniaudioCallback(ma_device *device, void *output, const void *input, uint32_t frameCount)
 {
     Q_UNUSED(input);
@@ -237,20 +153,8 @@ void Modem::miniaudioCallback(ma_device *device, void *output, const void *input
     Modem *that = reinterpret_cast<Modem*>(device->pUserData);
     std::lock_guard<std::recursive_mutex> lock(that->m_maMutex);
 
-    that->m_buffer.takeFrames(frameCount, output);
-    if (that->m_buffer.isEmpty()) {
+    that->m_buffer->takeFrames(frameCount, output);
+    if (that->m_buffer->isEmpty()) {
         emit that->finished();
     }
-}
-
-void AudioBuffer::takeFrames(int frameCount, void *output)
-{
-    const size_t byteCount = sizeof(float) * frameCount;
-    bzero(output, byteCount); // could Optimize™ and only zero the frames at the end, but idc
-    if (frameCount > m_audio.size()) {
-        frameCount = m_audio.size();
-    }
-
-    memcpy(output, m_audio.data(), byteCount);
-    m_audio.remove(0, frameCount);
 }
