@@ -40,6 +40,10 @@ set(PROJECT_SOURCES
         MiniAudio_impl.cpp
 )
 
+if(MSVC)
+    add_definitions(/D_USE_MATH_DEFINES)
+endif()
+
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(8bit-programmer
         ${PROJECT_SOURCES}
