@@ -25,7 +25,6 @@ Modem::Modem(QObject *parent) : QObject(parent)
     }
 
     connect(this, &Modem::finished, this, &Modem::stop, Qt::QueuedConnection);
-
 }
 
 Modem::~Modem()
@@ -76,21 +75,10 @@ bool Modem::initAudio(const QString &deviceName)
         qWarning() << "Failed to init device";
         return false;
     }
-    m_sampleRate = deviceConfig.sampleRate;
+
+    m_buffer.m_sampleRate = deviceConfig.sampleRate;
 
     qDebug() << "Got device" << m_device->playback.name;
-
-    ma_waveform_config config = ma_waveform_config_init(
-                m_device->playback.format,
-                m_device->playback.channels,
-                m_device->sampleRate,
-                ma_waveform_type_sine,
-                m_volume,
-                frequency(OriginatingMark)
-                );
-
-    m_waveform = std::make_unique<ma_waveform>();
-    ma_waveform_init(&config, m_waveform.get());
 
     m_clock.start();
 
@@ -98,7 +86,6 @@ bool Modem::initAudio(const QString &deviceName)
 
     return true;
 }
-
 void Modem::send(const QByteArray &bytes)
 {
     std::lock_guard<std::recursive_mutex> lock(m_maMutex);
@@ -107,7 +94,16 @@ void Modem::send(const QByteArray &bytes)
         return;
     }
 
-    const bool wasEmpty = m_sendBuffer.isEmpty();
+    const bool wasEmpty = m_buffer.isEmpty();
+    m_buffer.appendBytes(bytes);
+
+    if (wasEmpty && !ma_device_is_started(m_device.get())) {
+        ma_device_start(m_device.get());
+    }
+}
+
+void AudioBuffer::appendBytes(const QByteArray &bytes)
+{
     m_sendBuffer.append(bytes);
 
     qDebug() << "Sending" << bytes.toHex(' ');
@@ -123,9 +119,6 @@ void Modem::send(const QByteArray &bytes)
             break;
         }
         generateSound(&newAudio.data()[i], framesPerBit);
-
-        //ma_waveform_set_frequency(m_waveform.get(), frequency(m_currentTone));
-        //ma_waveform_read_pcm_frames(m_waveform.get(), &newAudio.data()[i], framesPerBit);
     }
 
     m_audio.append(newAudio);
@@ -133,12 +126,6 @@ void Modem::send(const QByteArray &bytes)
     if (!m_sendBuffer.isEmpty()) {
         qWarning() << "Audio buffer too small";
         qDebug() << m_sendBuffer.size() << m_audio.size();
-    }
-
-    if (wasEmpty && !ma_device_is_started(m_device.get())) {
-        m_time = 0.;
-        m_currentTone = Silence;
-        ma_device_start(m_device.get());
     }
 }
 
@@ -189,7 +176,7 @@ QStringList Modem::audioOutputDevices()
 
 #define TWO_PI (M_PI * 2.)
 
-void Modem::generateSound(float *output, size_t frames)
+void AudioBuffer::generateSound(float *output, size_t frames)
 {
     const int freq = frequency(m_currentTone);
     if (!freq || ! m_sampleRate) {
@@ -202,25 +189,7 @@ void Modem::generateSound(float *output, size_t frames)
     }
 }
 
-void Modem::maybeAdvance()
-{
-    std::lock_guard<std::recursive_mutex> lock(m_maMutex);
-
-    const int msecElapsed = qRound(m_clock.nsecsElapsed()/(1000.f * 100.f) + 1);
-    //qDebug() << m_clock.nsecsElapsed()/(1000. * 1000.);
-    if (msecElapsed < 10 * 1000/BAUDS) {
-        return;
-    }
-    m_clock.restart();
-    if (!advance()) {
-        m_currentTone = Silence;
-        ma_waveform_set_amplitude(m_waveform.get(), 0);
-        emit finished();
-    }
-    ma_waveform_set_frequency(m_waveform.get(), frequency(m_currentTone));
-}
-
-bool Modem::advance()
+bool AudioBuffer::advance()
 {
     if (m_bitNum > 9) {
         if (m_sendBuffer.isEmpty()) {
@@ -268,23 +237,20 @@ void Modem::miniaudioCallback(ma_device *device, void *output, const void *input
     Modem *that = reinterpret_cast<Modem*>(device->pUserData);
     std::lock_guard<std::recursive_mutex> lock(that->m_maMutex);
 
-    if (frameCount > that->m_audio.size()) {
-        frameCount = that->m_audio.size();
-    }
-    memcpy(output, that->m_audio.data(), sizeof(float) * frameCount);
-    that->m_audio.remove(0, frameCount);
-    if (that->m_audio.isEmpty()) {
+    that->m_buffer.takeFrames(frameCount, output);
+    if (that->m_buffer.isEmpty()) {
         emit that->finished();
     }
+}
 
-    //that->maybeAdvance();
-    //qDebug() << frameCount;
-    //that->generateSound(reinterpret_cast<float*>(output), frameCount);
+void AudioBuffer::takeFrames(int frameCount, void *output)
+{
+    const size_t byteCount = sizeof(float) * frameCount;
+    bzero(output, byteCount); // could Optimize™ and only zero the frames at the end, but idc
+    if (frameCount > m_audio.size()) {
+        frameCount = m_audio.size();
+    }
 
-    //if (that->m_currentTone == Silence) {
-    //    ma_waveform_set_amplitude(that->m_waveform.get(), 0);
-    //} else {
-    //    ma_waveform_set_amplitude(that->m_waveform.get(), that->m_volume);
-    //}
-    //ma_waveform_read_pcm_frames(that->m_waveform.get(), output, frameCount);
+    memcpy(output, m_audio.data(), byteCount);
+    m_audio.remove(0, frameCount);
 }

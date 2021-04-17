@@ -13,10 +13,21 @@ struct ma_device_info;
 struct ma_context;
 struct ma_waveform;
 
-class Modem : public QObject
+struct AudioBuffer
 {
-    Q_OBJECT
-public:
+    enum Encoding {
+        // Just one for now, hardcoded start/stop bits
+        Ascii8N1
+    };
+    Encoding m_encoding = Ascii8N1;
+
+    void takeFrames(int frameCount, void *output);
+    bool isEmpty() const { return m_audio.isEmpty(); }
+    void appendBytes(const QByteArray &bytes);
+
+    int m_sampleRate = 44100;
+
+private:
     enum Tone {
         OriginatingMark,
         OriginatingSpace,
@@ -25,14 +36,34 @@ public:
         Silence,
         ToneCount
     };
-    Q_ENUM(Tone)
 
-    enum Encoding {
-        // Just one for now, hardcoded start/stop bits
-        Ascii8N1
-    };
-    Q_ENUM(Encoding)
+    static inline int frequency(const Tone tone) {
+        switch(tone) {
+        case Tone::OriginatingMark: return 1270;
+        case Tone::OriginatingSpace: return 1070;
+        case Tone::AnsweringMark: return 2225;
+        case Tone::AnsweringSpace: return 2025;
+        default: return 1270; // Mark default when no signal
+        }
+    }
 
+    bool advance();
+    void generateSound(float *output, size_t frames);
+
+    double m_time = 0.; // idk should do math so it doesn't wrap randomly
+    QByteArray m_sendBuffer;
+    uint8_t m_currentByte = 0;
+    uint8_t m_bitNum = 0;
+
+    Tone m_currentTone = Silence;
+
+    QVector<float> m_audio;
+};
+
+class Modem : public QObject
+{
+    Q_OBJECT
+public:
     explicit Modem(QObject *parent);
     ~Modem();
 
@@ -53,35 +84,13 @@ signals:
     void finished();
 
 private:
-    static inline int frequency(const Tone tone) {
-        switch(tone) {
-        case Tone::OriginatingMark: return 1270;
-        case Tone::OriginatingSpace: return 1070;
-        case Tone::AnsweringMark: return 2225;
-        case Tone::AnsweringSpace: return 2025;
-        default: return 1270; // Mark default when no signal
-        }
-    }
-
-    void generateSound(float *output, size_t frames);
-    void maybeAdvance();
-    bool advance();
 
     static void miniaudioCallback(ma_device* device, void *output, const void *input, uint32_t frameCount);
-
-    QByteArray m_sendBuffer;
-    uint8_t m_currentByte = 0;
-    uint8_t m_bitNum = 0;
-
-    int m_sampleRate = 44100;
-    double m_time = 0.; // idk should do math so it doesn't wrap randomly
-
-    Tone m_currentTone = Silence;
 
     std::unique_ptr<ma_context> m_maContext;
     std::unique_ptr<ma_device> m_device;
     std::unique_ptr<ma_waveform> m_waveform;
-    float m_volume = 0.2f;
+    float m_volume = 1.0f;
 
     QElapsedTimer m_clock;
 
@@ -90,8 +99,8 @@ private:
 
     QHash<QString, std::shared_ptr<ma_device_info>> m_devices;
     QString m_currentDevice;
-    Encoding m_encoding = Ascii8N1;
 
-    QVector<float> m_audio;
+    AudioBuffer m_buffer;
+
 };
 
