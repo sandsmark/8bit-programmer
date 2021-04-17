@@ -78,4 +78,5 @@ jobs:
       with:
         artifacts: 8bit-programmer-${{ env.GITHUB_RUN_NUMBER }}.zip
         token: ${{ secrets.GITHUB_TOKEN }}
+        tag: 1
         allowUpdates: true
