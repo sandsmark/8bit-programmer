@@ -37,22 +37,22 @@ set(PROJECT_SOURCES
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    qt_add_executable(beneater-programmer
+    qt_add_executable(8bit-programmer
         ${PROJECT_SOURCES}
     )
 else()
     if(ANDROID)
-        add_library(beneater-programmer SHARED
+        add_library(8bit-programmer SHARED
             ${PROJECT_SOURCES}
         )
     else()
-        add_executable(beneater-programmer
+        add_executable(8bit-programmer
             ${PROJECT_SOURCES}
         )
     endif()
 endif()
 
-target_link_libraries(beneater-programmer
+target_link_libraries(8bit-programmer
     PRIVATE
         Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::SerialPort
