@@ -42,10 +42,17 @@ jobs:
 
     - name: Configure CMake
       run: |
-        cmake . -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        cmake . -DCMAKE_BUILD_TYPE=Release
 
     - name: Build
       shell: bash
       # Execute the build.  You can specify a specific target with "--target <NAME>"
       run: cmake --build .
 
+    - name: Upload result
+      uses: softprops/action-gh-release@v1
+      with:
+        files: Release/8bit-programmer.exe
+        name: wintendo-${{ env.GITHUB_RUN_NUMBER }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
