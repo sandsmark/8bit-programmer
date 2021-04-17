@@ -79,6 +79,5 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: 8bit-programmer-${{ env.GITHUB_RUN_NUMBER }}.zip
-        tag_name: 1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
