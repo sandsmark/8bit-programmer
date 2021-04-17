@@ -49,6 +49,8 @@ jobs:
       # Execute the build.  You can specify a specific target with "--target <NAME>"
       run: cmake --build . --config Release
 
+    - uses: ilammy/msvc-dev-cmd@v1
+
     - name: Package
       # Execute the build.  You can specify a specific target with "--target <NAME>"
       shell: cmd
