@@ -76,11 +76,13 @@ private slots:
     void onOutputChanged(const QString &outputName);
     void onBaudChanged(QString baudString);
     void onFrequencyChanged();
+    void saveAs();
+    void onLoadFileClicked();
+    void onNewFileClicked();
 
 private:
     static bool isSerialPort(const QString &name);
     bool loadFile(const QString &path);
-    void saveAs();
 
     int currentLineNumber();
     void scrollOutputTo(const int line);

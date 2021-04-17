@@ -67,6 +67,13 @@ Editor::Editor(QWidget *parent)
     QHBoxLayout *topLayout = new QHBoxLayout;
     mainLayout->addLayout(topLayout);
 
+    QPushButton *newFileButton = new QPushButton(QIcon::fromTheme("document-new"), "New file");
+    QPushButton *openFileButton = new QPushButton(QIcon::fromTheme("document-open"), "Open file...");
+    QPushButton *saveFileButton = new QPushButton(QIcon::fromTheme("document-save-as"), "Save file as...");
+    topLayout->addWidget(newFileButton);
+    topLayout->addWidget(openFileButton);
+    topLayout->addWidget(saveFileButton);
+
     topLayout->addStretch();
 
     topLayout->addWidget(new QLabel("CPU Type:"));
@@ -227,6 +234,9 @@ Editor::Editor(QWidget *parent)
 
     connect(uploadButton, &QPushButton::clicked, this, &Editor::onUploadClicked);
     connect(settingsButton, &QPushButton::clicked, this, &Editor::setSettingsVisible);
+    connect(newFileButton, &QPushButton::clicked, this, &Editor::onNewFileClicked);
+    connect(openFileButton, &QPushButton::clicked, this, &Editor::onLoadFileClicked);
+    connect(saveFileButton, &QPushButton::clicked, this, &Editor::saveAs);
     connect(m_asmEdit->verticalScrollBar(), &QScrollBar::valueChanged, this, &Editor::onScrolled);
     connect(m_asmEdit, &QPlainTextEdit::textChanged, this, &Editor::onAsmChanged);
     connect(m_asmEdit, &QPlainTextEdit::cursorPositionChanged, this, &Editor::onCursorMoved);
@@ -364,6 +374,25 @@ void Editor::saveAs()
         return;
     }
     m_currentFile = newPath;
+    save();
+}
+
+void Editor::onLoadFileClicked()
+{
+    QString newPath = QFileDialog::getOpenFileName(this, "Select file", QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation), "Ben Assembly File (*.basm)");
+    if (newPath.isEmpty()) {
+        return;
+    }
+    loadFile(newPath);
+}
+
+void Editor::onNewFileClicked()
+{
+    if (!m_currentFile.isEmpty()) {
+        save();
+    }
+    m_currentFile.clear();
+    m_asmEdit->clear();
     save();
 }
 
