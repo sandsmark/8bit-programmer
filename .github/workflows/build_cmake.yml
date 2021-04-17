@@ -25,7 +25,8 @@ jobs:
 
     - name: msvc is shit
       uses: ilammy/msvc-dev-cmd@v1
-      toolset: 14.0
+      with:
+        toolset: 14.0
 
     - name: Cache Qt
       id: cache-qt
