@@ -51,10 +51,9 @@ jobs:
 
     - name: Package
       # Execute the build.  You can specify a specific target with "--target <NAME>"
-      env:
-        VCINSTALLDIR: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/"
+      shell: cmd
       run: |
-        git tag wintendo-${{ env.GITHUB_RUN_NUMBER }}
+        git tag wintendo-%GITHUB_RUN_NUMBER%
         mkdir 8bit-programmer
         move Release\8bit-programmer.exe 8bit-programmer\
         copy "%VCINSTALLDIR%\redist\msvc\14.28.29910\x86\Microsoft.VC142.CRT\msvcp140.dll" 8bit-programmer
