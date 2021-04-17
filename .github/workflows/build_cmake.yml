@@ -23,6 +23,10 @@ jobs:
     - name: fetch submodules
       run: git submodule update --init --recursive
 
+    - name: msvc is shit
+      uses: ilammy/msvc-dev-cmd@v1
+      toolset: 14.0
+
     - name: Cache Qt
       id: cache-qt
       uses: actions/cache@v1
@@ -32,6 +36,7 @@ jobs:
 
     - name: Install Qt
       uses: jurplel/install-qt-action@v2
+      arch: win32_msvc2015
       with:
         cached: ${{ steps.cache-qt.outputs.cache-hit }}
 
@@ -49,26 +54,24 @@ jobs:
       # Execute the build.  You can specify a specific target with "--target <NAME>"
       run: cmake --build . --config Release
 
-    - uses: ilammy/msvc-dev-cmd@v1
-
     - name: Package
       # Execute the build.  You can specify a specific target with "--target <NAME>"
       shell: cmd
       env:
         GITHUB_RUN_NUMBER: ${{ env.GITHUB_RUN_NUMBER }}
       run: |
+        @echo on
         git tag wintendo-%GITHUB_RUN_NUMBER%
         mkdir 8bit-programmer
         move Release\8bit-programmer.exe 8bit-programmer\
-        @echo on
         echo "%VCINSTALLDIR%\redist\msvc\14.28.29910\x86\Microsoft.VC142.CRT\msvcp140.dll"
         copy "%VCINSTALLDIR%\redist\msvc\14.28.29910\x86\Microsoft.VC142.CRT\vcruntime140.dll" 8bit-programmer
         copy "%VCINSTALLDIR%\redist\msvc\14.28.29910\x86\Microsoft.VC142.CRT\vcruntime140.dll" 8bit-programmer
-        copy "%QTDIR%\bin\Qt5Core.dll" 8bit-programmer
-        copy "%QTDIR%\bin\Qt5Gui.dll" 8bit-programmer
-        copy "%QTDIR%\bin\Qt5Widgets.dll" 8bit-programmer
+        copy "%Qt5_Dir%\bin\Qt5Core.dll" 8bit-programmer
+        copy "%Qt5_Dir%\bin\Qt5Gui.dll" 8bit-programmer
+        copy "%Qt5_Dir%\bin\Qt5Widgets.dll" 8bit-programmer
         mkdir 8bit-programmer\platforms
-        copy "%QTDIR%\plugins\platforms\qwindows.dll" 8bit-programmer\platforms
+        copy "%Qt5_Dir%\plugins\platforms\qwindows.dll" 8bit-programmer\platforms
         7z a 8bit-programmer.zip 8bit-programmer\*
 
     - name: Upload result
