@@ -30,16 +30,24 @@ void AudioBuffer::appendBytes(const QByteArray &bytes)
 }
 
 #define TWO_PI (M_PI * 2.)
+#define VOLUME 1.0
 
 void AudioBuffer::generateSound(float *output, size_t frames)
 {
     const int freq = frequency(m_currentTone);
     if (!freq || ! sampleRate) {
+        qWarning() << "missing frequency or sample rate" << freq << sampleRate;
         return;
     }
     const double advance = double(freq) / sampleRate;
     for (size_t i=0; i<frames; i++) {
-        output[i] = sin(TWO_PI * m_time);
+        // square
+        //if (m_time - uint64_t(m_time) < 0.5) {
+        //    output[i] = VOLUME;
+        //} else {
+        //    output[i] = -VOLUME;
+        //}
+        output[i] = sin(TWO_PI * m_time) * VOLUME;
         m_time += advance;
     }
 }
