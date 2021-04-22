@@ -194,6 +194,15 @@ Editor::Editor(QWidget *parent)
     uploadBottomLayout->addWidget(m_serialOutput);
 
     QSettings settings;
+
+    const QString lastType = settings.value(s_settingsKeyType).toString();
+    if (lastType == s_settingsValExt) {
+        m_type = Type::ExtendedMemory;
+        m_typeDropdown->setCurrentIndex(1);
+    } else {
+        m_type = Type::BenEater;
+    }
+
     loadFile(settings.value("lastOpenedFile").toString());
     const QString lastOutputDevice = settings.value("lastOutputDevice").toString();
     if (isSerialPort(lastOutputDevice) || m_modem->audioOutputDevices().contains(lastOutputDevice)) {
@@ -204,14 +213,6 @@ Editor::Editor(QWidget *parent)
     } else if (m_modem->audioAvailable()) {
         m_baudSelect->setCurrentText(QString::number(settings.value("modemBaudRate", 300).toInt()));
         m_modem->setBaud(m_baudSelect->currentText().toInt());
-    }
-
-    const QString lastType = settings.value(s_settingsKeyType).toString();
-    if (lastType == s_settingsValExt) {
-        m_type = Type::ExtendedMemory;
-        m_typeDropdown->setCurrentIndex(1);
-    } else {
-        m_type = Type::BenEater;
     }
     int markFreq = settings.value("markFreq", 0).toInt();
     if (markFreq <= 0) {
