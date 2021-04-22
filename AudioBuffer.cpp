@@ -6,10 +6,7 @@
 
 void AudioBuffer::appendBytes(const QByteArray &bytes)
 {
-    qDebug() << markFrequency << spaceFrequency;
     m_sendBuffer.append(bytes);
-
-    qDebug() << "Sending" << bytes.toHex(' ');
 
     const int framesPerBit = sampleRate / baud; // idklol, i think this is right
     QVector<float> newAudio(m_sendBuffer.count() * 10 * framesPerBit);
