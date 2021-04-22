@@ -733,7 +733,8 @@ QString Editor::parseToBinary(const QString &line, int *num)
             // TODO: track line numbers
             const QString otherValue = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(m_memory[address]));
             const QString otherAddressBin = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(address));
-            return "; Memory address " + QString::number(address) + " (" + otherAddressBin + ") overwrites another value (" + otherValue + ")";
+            //return "; Memory address " + QString::number(address) + " (" + otherAddressBin + ") overwrites another value (" + otherValue + ")";
+            helpText +=  " WARNING: overwrites another value (" + otherValue + ")!";
         }
         m_memory[address] = binary;
 
