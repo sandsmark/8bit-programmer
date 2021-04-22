@@ -4,21 +4,41 @@
 
 #include <math.h>
 
+// Start and end with carrier, since soundcards have a tendency to be noisy when starting/stopping
+static constexpr int s_carrierPrefix = 100; // Prefix with 100 bits of carrier tone
+static constexpr int s_carrierSuffix = 100; // End with 100 bits of carrier tone
+
 void AudioBuffer::appendBytes(const QByteArray &bytes)
 {
     m_sendBuffer.append(bytes);
 
     const int framesPerBit = sampleRate / baud; // idklol, i think this is right
-    QVector<float> newAudio(m_sendBuffer.count() * 10 * framesPerBit);
+    const int prefixLength = s_carrierPrefix * framesPerBit;
+    const int suffixLength = s_carrierSuffix * framesPerBit;
+    QVector<float> newAudio(m_sendBuffer.count() * 10 * framesPerBit + prefixLength + suffixLength);
+
+    qDebug() << "Prefix frame length" << prefixLength << "frames per bit" << framesPerBit;
 
     m_bitNum = 10; // im lazy, > 9 makes advance() take the next byte
     m_time = 0.;
-    for (int i=0; i<newAudio.size(); i += framesPerBit) {
+
+    m_currentTone = AnsweringMark; // Carrier is the mark
+    int position = 0;
+    for (position=0; position<prefixLength; position += framesPerBit) {
+        generateSound(&newAudio.data()[position], framesPerBit);
+    }
+
+    for (; position<newAudio.size() - suffixLength; position += framesPerBit) {
         if (!advance()) {
-            qWarning() << "audio buffer too big" << i;
+            qWarning() << "audio buffer too big" << position;
             break;
         }
-        generateSound(&newAudio.data()[i], framesPerBit);
+        generateSound(&newAudio.data()[position], framesPerBit);
+    }
+
+    m_currentTone = AnsweringMark; // Keep some carrier, less abrupt end
+    for (; position<newAudio.size(); position += framesPerBit) {
+        generateSound(&newAudio.data()[position], framesPerBit);
     }
 
     m_audio.append(newAudio);
@@ -30,7 +50,6 @@ void AudioBuffer::appendBytes(const QByteArray &bytes)
 }
 
 #define TWO_PI (M_PI * 2.)
-#define VOLUME 1.0
 
 void AudioBuffer::generateSound(float *output, size_t frames)
 {
@@ -43,11 +62,11 @@ void AudioBuffer::generateSound(float *output, size_t frames)
     for (size_t i=0; i<frames; i++) {
         // square
         //if (m_time - uint64_t(m_time) < 0.5) {
-        //    output[i] = VOLUME;
+        //    output[i] = volume;
         //} else {
-        //    output[i] = -VOLUME;
+        //    output[i] = -volume;
         //}
-        output[i] = sin(TWO_PI * m_time) * VOLUME;
+        output[i] = sin(TWO_PI * m_time) * volume;
         m_time += advance;
     }
 }

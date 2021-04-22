@@ -23,6 +23,8 @@ struct AudioBuffer
     int spaceFrequency = 2025;
     int markFrequency = 2225;
 
+    float volume = 0.1;
+
 private:
     enum Tone {
         OriginatingMark,
