@@ -11,8 +11,7 @@
 
 #define DEVICE_FORMAT       ma_format_f32
 #define DEVICE_CHANNELS     1
-#define DEVICE_SAMPLE_RATE 41000
-//#define DEVICE_SAMPLE_RATE  48000
+#define DEVICE_SAMPLE_RATE 48000
 
 Modem::Modem(QObject *parent) : QObject(parent)
 {
