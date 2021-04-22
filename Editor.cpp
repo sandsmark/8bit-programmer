@@ -781,11 +781,27 @@ void SyntaxHighlighter::highlightBlock(const QString &text)
     QTextCharFormat binFormat2;
     binFormat2.setForeground(binColor.darker(150));
 
+    QTextCharFormat dbFormat;
+    dbFormat.setForeground(Qt::darkBlue);
+
     QRegularExpression expression(";.*$");
     QRegularExpressionMatchIterator i = expression.globalMatch(text);
     while (i.hasNext()) {
         QRegularExpressionMatch match = i.next();
         setFormat(match.capturedStart(), match.capturedLength(), commentFormat);
+    }
+
+    const QString dataRegex("(0x[0-9A-Fa-f]+|[0-9]+)");
+
+    {
+        expression.setPattern("^(\\.db) " + dataRegex + " " + dataRegex);
+        i = expression.globalMatch(text);
+        while (i.hasNext()) {
+            QRegularExpressionMatch match = i.next();
+            setFormat(match.capturedStart(1), match.capturedLength(1), dbFormat);
+            setFormat(match.capturedStart(2), match.capturedLength(2), addressFormat);
+            setFormat(match.capturedStart(3), match.capturedLength(3), varFormat);
+        }
     }
 
     if (!m_ops.isEmpty()) {
@@ -796,7 +812,7 @@ void SyntaxHighlighter::highlightBlock(const QString &text)
             setFormat(match.capturedStart(), match.capturedLength(), opcodeFormat);
         }
 
-        expression.setPattern("^[a-zA-Z ]+(0x[0-9A-Fa-f]+|[0-9]+)");
+        expression.setPattern("^[a-zA-Z ]+" + dataRegex);
         i = expression.globalMatch(text);
         while (i.hasNext()) {
             QRegularExpressionMatch match = i.next();
