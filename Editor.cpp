@@ -65,7 +65,6 @@ Editor::Editor(QWidget *parent)
     QVBoxLayout *mainLayout = new QVBoxLayout;
 
     QHBoxLayout *topLayout = new QHBoxLayout;
-    mainLayout->addLayout(topLayout);
 
     QPushButton *newFileButton = new QPushButton(QIcon::fromTheme("document-new"), "New file");
     QPushButton *openFileButton = new QPushButton(QIcon::fromTheme("document-open"), "Open file...");
@@ -86,7 +85,6 @@ Editor::Editor(QWidget *parent)
     editorLayout->setMargin(0);
 
     setLayout(mainLayout);
-    mainLayout->addLayout(editorLayout, 2);
 
     // Editor
     m_asmEdit = new QPlainTextEdit;
@@ -104,7 +102,6 @@ Editor::Editor(QWidget *parent)
     uploadButton->setEnabled(false); // Disabled unless there's a serial port available
 
     QHBoxLayout *uploadLayout = new QHBoxLayout;
-    mainLayout->addLayout(uploadLayout);
 
     m_serialPort = new QComboBox;
     m_serialPort->setEnabled(false);
@@ -145,7 +142,6 @@ Editor::Editor(QWidget *parent)
     uploadLayout->addWidget(settingsButton);
 
     m_settingsLayout = new QHBoxLayout;
-    mainLayout->addLayout(m_settingsLayout);
 
     m_markFreq = new QSpinBox;
     m_markFreq->setMaximum(30000);
@@ -181,6 +177,11 @@ Editor::Editor(QWidget *parent)
     m_settingsLayout->addWidget(m_baudSelect);
 
     QHBoxLayout *uploadBottomLayout = new QHBoxLayout;
+
+    mainLayout->addLayout(topLayout);
+    mainLayout->addLayout(editorLayout, 2);
+    mainLayout->addLayout(m_settingsLayout);
+    mainLayout->addLayout(uploadLayout);
     mainLayout->addLayout(uploadBottomLayout);
 
     m_memContents = new QPlainTextEdit;
