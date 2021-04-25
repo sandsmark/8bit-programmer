@@ -27,6 +27,18 @@ Windows builds can be found here, just download the zip file with the highest nu
 
 https://github.com/sandsmark/8bit-programmer/releases/tag/1
 
+Opcodes
+-------
+
+Basically just these:
+https://github.com/beneater/eeprom-programmer/blob/master/microcode-eeprom-with-flags/microcode-eeprom-with-flags.ino#L39-L54
+
+In addition there's `.db address value [label]`. `[label]` is an optional name
+for referring to the address of the value, so you don't need to manually update
+adresses as you move things around. So `.db 0x3 0xaa foo` will program in the
+value `0xaa` at memory adress `0x3`, and then you can write e. g. `lda foo`
+elsewhere in the code.
+
 Modem
 -----
 
