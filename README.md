@@ -5,7 +5,7 @@ of cheating by relying on an e. g. an Arduino that is a gazillion times as
 powerful as our own system. So far only parts of the mo part has been
 implemented.
 
-![screenshot](/screenshot-2021-04-10.png)
+![screenshot](/screenshot-2021-04-25.png)
 
 I've never written an assembler and this is a quick 30 minutes hack, so YMMV.
 
