@@ -4,6 +4,8 @@
 
 #include <math.h>
 
+#define WAVEFORM_SQUARE 1
+
 // Start and end with carrier, since soundcards have a tendency to be noisy when starting/stopping
 static constexpr int s_carrierPrefix = 100; // Prefix with 100 bits of carrier tone
 static constexpr int s_carrierSuffix = 100; // End with 100 bits of carrier tone
@@ -61,12 +63,17 @@ void AudioBuffer::generateSound(float *output, size_t frames)
     const double advance = double(freq) / sampleRate;
     for (size_t i=0; i<frames; i++) {
         // square
-        //if (m_time - uint64_t(m_time) < 0.5) {
-        //    output[i] = volume;
-        //} else {
-        //    output[i] = -volume;
-        //}
+#ifdef WAVEFORM_SINE
         output[i] = sin(TWO_PI * m_time) * volume;
+#elif defined(WAVEFORM_SQUARE)
+        if (m_time - uint64_t(m_time) < 0.5) {
+            output[i] = volume;
+        } else {
+            output[i] = -volume;
+        }
+#else
+#error "No waveform defined"
+#endif
         m_time += advance;
     }
 }
