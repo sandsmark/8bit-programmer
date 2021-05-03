@@ -3,6 +3,9 @@
 #include "AudioBuffer.h"
 
 #include <QDebug>
+#include <cmath>
+#include <QThread>
+#include <QCoreApplication>
 
 #define MA_NO_JACK
 #define MA_NO_SDL
@@ -15,6 +18,8 @@
 
 Modem::Modem(QObject *parent) : QObject(parent)
 {
+    Q_ASSERT(QThread::currentThread() == qApp->thread());
+
     m_buffer = std::make_unique<AudioBuffer>();
     m_maContext = std::make_unique<ma_context>();
     ma_result ret = ma_context_init(nullptr, 0, nullptr, m_maContext.get());
@@ -29,7 +34,7 @@ Modem::Modem(QObject *parent) : QObject(parent)
 
 Modem::~Modem()
 {
-    std::lock_guard<std::recursive_mutex> lock(m_maMutex);
+    Q_ASSERT(QThread::currentThread() == qApp->thread());
 
     if (m_device) {
         ma_device_uninit(m_device.get());
@@ -37,10 +42,14 @@ Modem::~Modem()
     if (m_maContext) {
         ma_context_uninit(m_maContext.get());
     }
+
+    std::lock_guard<std::recursive_mutex> lock(m_maMutex);
 }
 
 bool Modem::initAudio(const QString &deviceName)
 {
+    Q_ASSERT(QThread::currentThread() == qApp->thread());
+
     std::lock_guard<std::recursive_mutex> lock(m_maMutex);
 
     if (m_currentDevice == deviceName && m_device) {
@@ -78,7 +87,7 @@ bool Modem::initAudio(const QString &deviceName)
 
     m_buffer->sampleRate = deviceConfig.sampleRate;
 
-    qDebug() << "Got device" << m_device->playback.name;
+    qDebug() << "Got device" << m_device->playback.name << "sample rate" << m_buffer->sampleRate;
 
     m_clock.start();
 
@@ -88,7 +97,9 @@ bool Modem::initAudio(const QString &deviceName)
 }
 void Modem::send(const QByteArray &bytes)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_maMutex);
+    Q_ASSERT(QThread::currentThread() == qApp->thread());
+
+    std::unique_lock<std::recursive_mutex> lock(m_maMutex);
     if (!m_device) {
         qWarning() << "No device available, refusing to fill buffer";
         return;
@@ -97,6 +108,7 @@ void Modem::send(const QByteArray &bytes)
     const bool wasEmpty = m_buffer->isEmpty();
     m_buffer->appendBytes(bytes);
 
+    lock.unlock();
     if (wasEmpty && !ma_device_is_started(m_device.get())) {
         ma_device_start(m_device.get());
     }
@@ -104,13 +116,16 @@ void Modem::send(const QByteArray &bytes)
 
 void Modem::sendHex(const QByteArray &encoded)
 {
+    Q_ASSERT(QThread::currentThread() == qApp->thread());
+
     std::lock_guard<std::recursive_mutex> lock(m_maMutex);
     send(QByteArray::fromHex(encoded));
 }
 
 void Modem::stop()
 {
-    std::lock_guard<std::recursive_mutex> lock(m_maMutex);
+    Q_ASSERT(QThread::currentThread() == qApp->thread());
+
     ma_device_stop(m_device.get());
 }
 
@@ -168,6 +183,8 @@ void Modem::setSampleRate(const int /*rate*/)
 
 void Modem::setFrequencies(const int space, const int mark)
 {
+    Q_ASSERT(QThread::currentThread() == qApp->thread());
+
     m_buffer->spaceFrequency = space;
     m_buffer->markFrequency = mark;
 }
