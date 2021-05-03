@@ -79,6 +79,7 @@ private slots:
     void saveAs();
     void onLoadFileClicked();
     void onNewFileClicked();
+    void setVolume(const int percent);
 
 private:
     static bool isSerialPort(const QString &name);

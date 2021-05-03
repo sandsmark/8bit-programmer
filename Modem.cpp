@@ -150,6 +150,7 @@ void Modem::updateAudioDevices()
         }
         m_devices[name] = std::make_shared<ma_device_info>(devicesInfo[i]);
     }
+    emit devicesUpdated(m_outputDeviceList);
 }
 
 void Modem::setBaud(const int baud)
@@ -169,6 +170,14 @@ void Modem::setFrequencies(const int space, const int mark)
 {
     m_buffer->spaceFrequency = space;
     m_buffer->markFrequency = mark;
+}
+
+void Modem::setVolume(const float volume)
+{
+    Q_ASSERT(QThread::currentThread() == qApp->thread());
+
+    static constexpr qreal loudnessToVoltage = qreal(0.67);
+    m_buffer->volume = qBound(0., pow(volume, loudnessToVoltage) , 1.);
 }
 
 void Modem::miniaudioCallback(ma_device *device, void *output, const void *input, uint32_t frameCount)

@@ -32,18 +32,20 @@ public:
     void setBaud(const int baud);
     void setSampleRate(const int rate);
     void setFrequencies(const int space, const int mark);
+    void setVolume(const float volume);
 
 public slots:
     void send(const QByteArray &bytes);
     void sendHex(const QByteArray &bytes);
     void stop();
     void setAudioDevice(const QString &name) { qDebug() << "Setting" << name;  initAudio(name); }
+    void updateAudioDevices();
 
 signals:
     void finished();
+    void devicesUpdated(const QStringList devices);
 
 private:
-    void updateAudioDevices();
 
     static void miniaudioCallback(ma_device* device, void *output, const void *input, uint32_t frameCount);
 

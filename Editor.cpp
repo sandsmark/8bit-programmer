@@ -22,6 +22,7 @@
 #include <QFileDialog>
 #include <QTextBlock>
 #include <QSpinBox>
+#include <QSlider>
 
 #include <QtMath>
 
@@ -29,6 +30,7 @@ static const char *s_settingsKeyType = "Type";
 static const char *s_settingsValOrig = "Original";
 static const char *s_settingsValExt = "Extended";
 static const char *s_modemName = "Modem";
+static const char *s_settingsKeyVolume = "Volume";
 
 bool Editor::isSerialPort(const QString &name)
 {
@@ -131,6 +133,8 @@ Editor::Editor(QWidget *parent)
     }
     m_serialPort->setFixedWidth(200);
 
+    QPushButton *refreshButton = new QPushButton(tr("Refresh"));
+
     uploadLayout->addWidget(new QLabel("Memory contents:"));
     uploadLayout->addStretch();
 
@@ -139,6 +143,8 @@ Editor::Editor(QWidget *parent)
 
     uploadLayout->addWidget(new QLabel("Output device:"));
     uploadLayout->addWidget(m_serialPort);
+    uploadLayout->addWidget(refreshButton);
+    uploadLayout->addStretch();
     uploadLayout->addWidget(settingsButton);
 
     m_settingsLayout = new QHBoxLayout;
@@ -159,6 +165,13 @@ Editor::Editor(QWidget *parent)
     m_settingsLayout->addWidget(m_markFreq);
     m_settingsLayout->addStretch();
 
+    QSlider *volumeSlider = new QSlider;
+    volumeSlider->setMinimum(1);
+    volumeSlider->setMaximum(100);
+    volumeSlider->setOrientation(Qt::Horizontal);
+    m_settingsLayout->addWidget(new QLabel(tr("Volume:")));
+    m_settingsLayout->addWidget(volumeSlider);
+    m_settingsLayout->addStretch();
 
     m_baudSelect = new BaudEdit();
 
@@ -246,6 +259,11 @@ Editor::Editor(QWidget *parent)
     connect(m_baudSelect, &QComboBox::textActivated, this, &Editor::onBaudChanged); // meh, use currenttext because the other is overloaded
     connect(m_spaceFreq, &QSpinBox::textChanged, this, &Editor::onFrequencyChanged); // valueChanged is fucked because wtf qt
     connect(m_markFreq, &QSpinBox::textChanged, this, &Editor::onFrequencyChanged); // valueChanged is fucked because wtf qt
+    connect(volumeSlider, &QSlider::valueChanged, this, &Editor::setVolume);
+    connect(refreshButton, &QPushButton::clicked, m_modem, &Modem::updateAudioDevices);
+    connect(m_modem, &Modem::devicesUpdated, this, [this](const QStringList &devices) { m_serialPort->clear(); m_serialPort->addItems(devices); });
+
+    volumeSlider->setValue(settings.value(s_settingsKeyVolume, 100).toInt());
 
     setSettingsVisible(false);
 }
@@ -396,6 +414,14 @@ void Editor::onNewFileClicked()
     m_currentFile.clear();
     m_asmEdit->clear();
     save();
+}
+
+void Editor::setVolume(const int percent)
+{
+    QSettings settings;
+    settings.setValue(s_settingsKeyVolume, percent);
+
+    m_modem->setVolume(percent / 100.f);
 }
 
 int Editor::currentLineNumber()
