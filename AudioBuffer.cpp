@@ -1,6 +1,7 @@
 #include "AudioBuffer.h"
 
 #include <QDebug>
+#include <QFile>
 
 #include <math.h>
 
@@ -49,6 +50,110 @@ void AudioBuffer::appendBytes(const QByteArray &bytes)
         qWarning() << "Audio buffer too small";
         qDebug() << m_sendBuffer.size() << m_audio.size();
     }
+
+    //saveWavFile("test.wav");
+}
+
+namespace {
+    struct WavHeader {
+        // RIFF header
+        //uint32_t chunkID;
+        const char chunkID[4] = {'R', 'I', 'F', 'F'};
+        uint32_t chunkSize = 0;
+        const char format[4] = {'W', 'A', 'V', 'E'};
+
+        // fmt subchunk
+        const char subchunk1ID[4] = {'f', 'm', 't', ' '};
+        const uint32_t subchunk1Size =
+            sizeof(audioFormat) +
+            sizeof(numChannels) +
+            sizeof(sampleRate) +
+            sizeof(byteRate) +
+            sizeof(blockAlign) +
+            sizeof(bitsPerSample);
+
+        enum AudioFormats {
+            Invalid = 0x0,
+            PCM = 0x1,
+            ADPCM = 0x2,
+            IEEEFloat = 0x3,
+            ALaw = 0x6,
+            MULaw = 0x7,
+            DVIADPCM = 0x11,
+            AAC = 0xff,
+            WWISE = 0xffffu,
+        };
+        uint16_t audioFormat = Invalid;
+
+        uint16_t numChannels = 0;
+        uint32_t sampleRate = 0;
+        uint32_t byteRate = 0;
+        uint16_t blockAlign = 0;
+        uint16_t bitsPerSample = 0;
+
+        // data subchunk
+        const char subchunk2ID[4] = {'d', 'a', 't', 'a'};
+        uint32_t subchunk2Size = 0;
+
+        bool isValid() const {
+            return
+                chunkSize &&
+                audioFormat &&
+                audioFormat &&
+                numChannels &&
+                sampleRate &&
+                byteRate &&
+                blockAlign &&
+                bitsPerSample &&
+                subchunk2Size;
+        };
+    };
+} // namespace
+
+void AudioBuffer::saveWavFile(const QString &filename)
+{
+#if Q_BYTE_ORDER == Q_BIG_ENDIAN
+#error "I can't be bothered to support big endian"
+#endif
+
+    if (m_audio.isEmpty()) {
+        qWarning() << "No audio to save";
+        return false;
+    }
+
+    QFile file(filename);
+    if (!file.open(QIODevice::WriteOnly)) {
+        qWarning() << "Failed to open" << filename << "for writing";
+        return false;
+    }
+    WavHeader header;
+    if (std::is_floating_point<decltype(m_audio)::value_type>::value) {
+        header.audioFormat = WavHeader::IEEEFloat;
+    } else {
+        header.audioFormat = WavHeader::PCM;
+    }
+    header.numChannels = channels;
+    header.sampleRate = sampleRate;
+    header.bitsPerSample = sizeof(decltype(m_audio)::value_type) * 8;
+    header.byteRate = header.sampleRate * header.numChannels * (header.bitsPerSample / 8);
+    header.blockAlign = header.numChannels * (header.bitsPerSample / 8);
+
+    header.subchunk2Size = m_audio.size() * header.numChannels * (header.bitsPerSample / 8);
+    header.chunkSize = sizeof(header.format) +
+        (sizeof(header.subchunk1ID) + sizeof(header.subchunk1Size) + header.subchunk1Size) +
+        (sizeof(header.subchunk2ID) + sizeof(header.subchunk2Size) + header.subchunk2Size);
+
+    Q_ASSERT(*(const uint32_t*)(header.chunkID) == 0x46464952);
+    Q_ASSERT(*(const uint32_t*)(header.subchunk1ID) == 0x20746d66);
+    Q_ASSERT(*(const uint32_t*)(header.subchunk2ID) == 0x61746164);
+    Q_ASSERT(header.chunkSize == 36 + header.subchunk2Size);
+
+    Q_ASSERT(header.isValid());
+
+    file.write(reinterpret_cast<const char*>(&header), sizeof(WavHeader));
+    file.write(reinterpret_cast<const char*>(m_audio.data()), m_audio.size() * sizeof(decltype(m_audio)::value_type));
+
+    return true;
 }
 
 #define TWO_PI (M_PI * 2.)

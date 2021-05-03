@@ -16,7 +16,9 @@ struct AudioBuffer
     void takeFrames(int frameCount, void *output);
     bool isEmpty() const { return m_audio.isEmpty(); }
     void appendBytes(const QByteArray &bytes);
+    bool saveWavFile(const QString &filename);
 
+    int channels = 1;
     int sampleRate = 44100;
     int baud = 300;
 
