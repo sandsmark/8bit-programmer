@@ -59,7 +59,7 @@ void AudioBuffer::appendBytes(const QByteArray &bytes)
         qDebug() << m_sendBuffer.size() << m_audio.size();
     }
 
-    //saveWavFile("test.wav");
+    saveWavFile("test.wav");
 }
 
 namespace {
@@ -118,7 +118,7 @@ namespace {
     };
 } // namespace
 
-void AudioBuffer::saveWavFile(const QString &filename)
+bool AudioBuffer::saveWavFile(const QString &filename)
 {
 #if Q_BYTE_ORDER == Q_BIG_ENDIAN
 #error "I can't be bothered to support big endian"
