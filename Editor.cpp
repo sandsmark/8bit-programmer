@@ -43,12 +43,12 @@ bool Editor::isSerialPort(const QString &name)
 
 void Editor::onDevicesUpdated(const QStringList &devices)
 {
-    QString selectedDevice = m_serialPort->currentText();
-    m_serialPort->clear();
-    m_serialPort->addItems(devices);
-    int newIndex = m_serialPort->findText(selectedDevice);
+    QString selectedDevice = m_outputSelect->currentText();
+    m_outputSelect->clear();
+    m_outputSelect->addItems(devices);
+    int newIndex = m_outputSelect->findText(selectedDevice);
     if (newIndex != -1) {
-        m_serialPort->setCurrentIndex(newIndex);
+        m_outputSelect->setCurrentIndex(newIndex);
     }
 }
 
@@ -116,14 +116,14 @@ Editor::Editor(QWidget *parent)
 
     QHBoxLayout *uploadLayout = new QHBoxLayout;
 
-    m_serialPort = new QComboBox;
-    m_serialPort->setEnabled(false);
+    m_outputSelect = new QComboBox;
+    m_outputSelect->setEnabled(false);
 
     m_modem = new Modem(this);
     {
         if (m_modem->audioAvailable()) {
-            connect(m_serialPort, &QComboBox::currentTextChanged, m_modem, &Modem::setAudioDevice);
-            m_serialPort->addItems(m_modem->audioOutputDevices());
+            connect(m_outputSelect, &QComboBox::currentTextChanged, m_modem, &Modem::setAudioDevice);
+            m_outputSelect->addItems(m_modem->audioOutputDevices());
             connect(this, &Editor::sendData, m_modem, &Modem::sendHex);
         } else {
             m_modem->deleteLater();
@@ -135,14 +135,14 @@ Editor::Editor(QWidget *parent)
 
     for (const QSerialPortInfo &portInfo : QSerialPortInfo::availablePorts()) {
         qDebug() << "Port:" << portInfo.portName();
-        m_serialPort->addItem(portInfo.portName());
+        m_outputSelect->addItem(portInfo.portName());
     }
 
-    if (m_serialPort->count() > 0) {
+    if (m_outputSelect->count() > 0) {
         uploadButton->setEnabled(true);
-        m_serialPort->setEnabled(true);
+        m_outputSelect->setEnabled(true);
     }
-    m_serialPort->setFixedWidth(200);
+    m_outputSelect->setFixedWidth(200);
 
     QPushButton *refreshButton = new QPushButton(tr("Refresh"));
 
@@ -153,7 +153,7 @@ Editor::Editor(QWidget *parent)
     uploadLayout->addStretch();
 
     uploadLayout->addWidget(new QLabel("Output device:"));
-    uploadLayout->addWidget(m_serialPort);
+    uploadLayout->addWidget(m_outputSelect);
     uploadLayout->addWidget(refreshButton);
     uploadLayout->addStretch();
     uploadLayout->addWidget(settingsButton);
@@ -230,9 +230,9 @@ Editor::Editor(QWidget *parent)
     loadFile(settings.value("lastOpenedFile").toString());
     const QString lastOutputDevice = settings.value("lastOutputDevice").toString();
     if (isSerialPort(lastOutputDevice) || m_modem->audioOutputDevices().contains(lastOutputDevice)) {
-        m_serialPort->setCurrentText(lastOutputDevice);
+        m_outputSelect->setCurrentText(lastOutputDevice);
     }
-    if (isSerialPort(m_serialPort->currentText())) {
+    if (isSerialPort(m_outputSelect->currentText())) {
         m_baudSelect->setCurrentText(QString::number(settings.value("serialBaudRate", 115200).toInt()));
     } else if (m_modem->audioAvailable()) {
         m_baudSelect->setCurrentText(QString::number(settings.value("modemBaudRate", 300).toInt()));
@@ -273,7 +273,7 @@ Editor::Editor(QWidget *parent)
     connect(volumeSlider, &QSlider::valueChanged, this, &Editor::setVolume);
     connect(refreshButton, &QPushButton::clicked, m_modem, &Modem::updateAudioDevices);
     connect(m_modem, &Modem::devicesUpdated, this, &Editor::onDevicesUpdated);
-    connect(m_serialPort, &QComboBox::textActivated, this, &Editor::onOutputChanged);
+    connect(m_outputSelect, &QComboBox::textActivated, this, &Editor::onOutputChanged);
 
     volumeSlider->setValue(settings.value(s_settingsKeyVolume, 100).toInt());
 
@@ -346,12 +346,12 @@ void Editor::onUploadClicked()
 
     const QByteArray data = m_memContents->toPlainText().toLatin1();
 
-    if (!isSerialPort(m_serialPort->currentText())) {
+    if (!isSerialPort(m_outputSelect->currentText())) {
         emit sendData(data);
         return;
     }
 
-    QSerialPort serialPort(m_serialPort->currentText());
+    QSerialPort serialPort(m_outputSelect->currentText());
     serialPort.setBaudRate(m_baudSelect->currentText().toInt());
 
     if (!serialPort.open(QIODevice::ReadWrite)) {
@@ -506,7 +506,7 @@ void Editor::setSettingsVisible(bool visible)
         }
         widget->setVisible(visible);
     }
-    if (visible && m_modem->audioOutputDevices().contains(m_serialPort->currentText())) {
+    if (visible && m_modem->audioOutputDevices().contains(m_outputSelect->currentText())) {
         m_spaceFreq->setEnabled(true);
         m_markFreq->setEnabled(true);
     } else {
@@ -521,7 +521,7 @@ void Editor::onOutputChanged(const QString &outputName)
     QSettings settings;
     settings.setValue("lastOutputDevice", outputName);
 
-    if (isSerialPort(m_serialPort->currentText())) {
+    if (isSerialPort(m_outputSelect->currentText())) {
         m_baudSelect->setCurrentText(QString::number(settings.value("serialBaudRate", 115200).toInt()));
     } else if (m_modem->audioAvailable()) {
         m_baudSelect->setCurrentText(QString::number(settings.value("modemBaudRate", 300).toInt()));
@@ -546,9 +546,9 @@ void Editor::onBaudChanged(QString baudString)
 
     QSettings settings;
 
-    if (isSerialPort(m_serialPort->currentText())) {
+    if (isSerialPort(m_outputSelect->currentText())) {
         settings.setValue("serialBaudRate", baud);
-    } else if (m_modem->audioOutputDevices().contains(m_serialPort->currentText())) {
+    } else if (m_modem->audioOutputDevices().contains(m_outputSelect->currentText())) {
         settings.setValue("modemBaudRate", baud);
         m_modem->setBaud(baud);
     }

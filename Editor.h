@@ -106,7 +106,7 @@ private:
     const QHash<QString, Operator> m_ops;
     QMap<uint32_t, uint8_t> m_memory; // qmap is sorted
     QPlainTextEdit *m_memContents = nullptr;
-    QComboBox *m_serialPort = nullptr;
+    QComboBox *m_outputSelect = nullptr;
 
     QComboBox *m_typeDropdown = nullptr;
 
