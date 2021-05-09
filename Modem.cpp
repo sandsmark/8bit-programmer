@@ -197,6 +197,20 @@ void Modem::setVolume(const float volume)
     m_buffer->volume = qBound(0., pow(volume, loudnessToVoltage) , 1.);
 }
 
+AudioBuffer::Waveform Modem::currentWaveform() const
+{
+    return m_buffer->waveform;
+}
+
+void Modem::setWaveform(int waveform)
+{
+    if (waveform <= AudioBuffer::Invalid || waveform >= AudioBuffer::WaveformCount) {
+        qWarning() << "Invalid waveform" << waveform << "defaulting to triangle";
+        waveform = AudioBuffer::Triangle;
+    }
+    m_buffer->waveform = AudioBuffer::Waveform(waveform);
+}
+
 void Modem::miniaudioCallback(ma_device *device, void *output, const void *input, uint32_t frameCount)
 {
     Q_UNUSED(input);

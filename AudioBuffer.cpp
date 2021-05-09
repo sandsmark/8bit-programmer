@@ -5,8 +5,6 @@
 
 #include <math.h>
 
-#define WAVEFORM_SQUARE 1
-
 // Start and end with carrier, since soundcards have a tendency to be noisy when starting/stopping
 static constexpr int s_carrierPrefix = 100; // Prefix with 100 bits of carrier tone
 static constexpr int s_carrierSuffix = 100; // End with 100 bits of carrier tone
@@ -168,26 +166,47 @@ bool AudioBuffer::saveWavFile(const QString &filename)
 
 void AudioBuffer::generateSound(float *output, size_t frames)
 {
+    if (m_currentTone == Silence) {
+        for (size_t i=0; i<frames; i++) {
+            output[i] = 0;
+        }
+        return;
+    }
     const int freq = frequency(m_currentTone);
     if (!freq || ! sampleRate) {
         qWarning() << "missing frequency or sample rate" << freq << sampleRate;
         return;
     }
     const double advance = double(freq) / sampleRate;
-    for (size_t i=0; i<frames; i++) {
-        // square
-#ifdef WAVEFORM_SINE
-        output[i] = sin(TWO_PI * m_time) * volume;
-#elif defined(WAVEFORM_SQUARE)
-        if (m_time - uint64_t(m_time) < 0.5) {
-            output[i] = volume;
-        } else {
-            output[i] = -volume;
+    switch(waveform) {
+    case Sine:
+        for (size_t i=0; i<frames; i++, m_time += advance) {
+            output[i] = sin(TWO_PI * m_time) * volume;
         }
-#else
-#error "No waveform defined"
-#endif
-        m_time += advance;
+        break;
+    case Sawtooth:
+        for (size_t i=0; i<frames; i++, m_time += advance) {
+            output[i] = 2 * ((m_time - int64_t(m_time)) - 0.5) * volume;
+        }
+        break;
+    case Triangle:
+        for (size_t i=0; i<frames; i++, m_time += advance) {
+            output[i] = (2 * std::abs(2 * ((m_time - int64_t(m_time)) - 0.5)) - 1) * volume;
+        }
+        break;
+    case Square:
+        for (size_t i=0; i<frames; i++) {
+            if (m_time - int64_t(m_time) < 0.5) {
+                output[i] = volume;
+            } else {
+                output[i] = -volume;
+            }
+            m_time += advance;
+        }
+        break;
+    default:
+        assert(false);
+        break;
     }
 }
 

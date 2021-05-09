@@ -36,6 +36,7 @@ static const char *s_settingsKeyLastOutput = "lastOutputDevice";
 static const char *s_settingsKeyLastFile = "lastOpenedFile";
 static const char *s_settingsKeySpaceFreq = "spaceFreq";
 static const char *s_settingsKeyMarkFreq = "markFreq";
+static const char *s_settingsKeyWaveform = "waveform";
 
 bool Editor::isSerialPort(const QString &name)
 {
@@ -189,6 +190,17 @@ Editor::Editor(QWidget *parent)
     m_settingsLayout->addWidget(volumeSlider);
     m_settingsLayout->addStretch();
 
+    QComboBox *waveformSelect = new QComboBox;
+    waveformSelect->addItems({
+        tr("Square"),
+        tr("Sawtooth"),
+        tr("Triangle"),
+        tr("Sine"),
+        });
+    m_settingsLayout->addWidget(new QLabel("Waveform:"));
+    m_settingsLayout->addWidget(waveformSelect);
+    m_settingsLayout->addStretch();
+
     m_baudSelect = new BaudEdit();
 
     m_baudSelect->setEditable(true);
@@ -247,15 +259,18 @@ Editor::Editor(QWidget *parent)
     if (markFreq <= 0) {
         markFreq = 2225;
     }
-    qDebug() << "loaded" << markFreq;
+    qDebug() << "loaded mark" << markFreq;
     m_markFreq->setValue(markFreq);
     int spaceFreq = settings.value(s_settingsKeySpaceFreq, 0).toInt();
     if (spaceFreq <= 0) {
        spaceFreq = 2025;
     }
-    qDebug() << "Loaded" << spaceFreq;
+    qDebug() << "Loaded space" << spaceFreq;
     m_spaceFreq->setValue(spaceFreq);
     m_modem->setFrequencies(spaceFreq, markFreq);
+
+    m_modem->setWaveform(settings.value(s_settingsKeyWaveform, AudioBuffer::Triangle).toInt());
+    waveformSelect->setCurrentIndex(m_modem->currentWaveform());
 
     QTimer *timer = new QTimer(this);
     timer->setSingleShot(true);
@@ -279,6 +294,7 @@ Editor::Editor(QWidget *parent)
     connect(refreshButton, &QPushButton::clicked, m_modem, &Modem::updateAudioDevices);
     connect(m_modem, &Modem::devicesUpdated, this, &Editor::onDevicesUpdated);
     connect(m_outputSelect, &QComboBox::textActivated, this, &Editor::onOutputChanged);
+    connect(waveformSelect, qOverload<int>(&QComboBox::currentIndexChanged), this, &Editor::onWaveformSelected);
 
     volumeSlider->setValue(settings.value(s_settingsKeyVolume, 100).toInt());
 
@@ -439,6 +455,17 @@ void Editor::setVolume(const int percent)
     settings.setValue(s_settingsKeyVolume, percent);
 
     m_modem->setVolume(percent / 100.f);
+}
+
+void Editor::onWaveformSelected(int waveform)
+{
+    if (waveform <= AudioBuffer::Invalid || waveform >= AudioBuffer::WaveformCount) {
+        qWarning() << "Invalid waveform" << waveform << "defaulting to triangle";
+        waveform = AudioBuffer::Triangle;
+    }
+    m_modem->setWaveform(AudioBuffer::Waveform(waveform));
+    QSettings settings;
+    settings.setValue(s_settingsKeyWaveform, waveform);
 }
 
 int Editor::currentLineNumber()

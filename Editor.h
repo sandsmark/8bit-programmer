@@ -83,6 +83,7 @@ private slots:
     void onLoadFileClicked();
     void onNewFileClicked();
     void setVolume(const int percent);
+    void onWaveformSelected(int waveform);
 
 private:
     static bool isSerialPort(const QString &name);

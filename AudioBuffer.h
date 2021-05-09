@@ -12,6 +12,15 @@ struct AudioBuffer
         Ascii8N1
     };
     Encoding m_encoding = Ascii8N1;
+    enum Waveform {
+        Invalid = -1,
+        Square,
+        Sawtooth,
+        Triangle,
+        Sine,
+        WaveformCount
+    };
+    Waveform waveform = Triangle;
 
     void takeFrames(int frameCount, void *output);
     bool isEmpty() const { return m_audio.isEmpty(); }

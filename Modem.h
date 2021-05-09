@@ -1,5 +1,7 @@
 #pragma once
 
+#include "AudioBuffer.h"
+
 #include <QObject>
 #include <QElapsedTimer>
 #include <QHash>
@@ -12,8 +14,6 @@ struct ma_device;
 struct ma_device_info;
 struct ma_context;
 struct ma_waveform;
-
-struct AudioBuffer;
 
 class Modem : public QObject
 {
@@ -33,6 +33,8 @@ public:
     void setSampleRate(const int rate);
     void setFrequencies(const int space, const int mark);
     void setVolume(const float volume);
+    void setWaveform(int waveform);
+    AudioBuffer::Waveform currentWaveform() const;
 
 public slots:
     void send(const QByteArray &bytes);
