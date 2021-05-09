@@ -27,10 +27,15 @@
 #include <QtMath>
 
 static const char *s_settingsKeyType = "Type";
-static const char *s_settingsValOrig = "Original";
 static const char *s_settingsValExt = "Extended";
-static const char *s_modemName = "Modem";
+static const char *s_settingsValOrig = "Original";
 static const char *s_settingsKeyVolume = "Volume";
+static const char *s_settingsKeyModemBaudRate = "modemBaudRate";
+static const char *s_settingsKeySerialBaudRate = "serialBaudRate";
+static const char *s_settingsKeyLastOutput = "lastOutputDevice";
+static const char *s_settingsKeyLastFile = "lastOpenedFile";
+static const char *s_settingsKeySpaceFreq = "spaceFreq";
+static const char *s_settingsKeyMarkFreq = "markFreq";
 
 bool Editor::isSerialPort(const QString &name)
 {
@@ -227,24 +232,24 @@ Editor::Editor(QWidget *parent)
         m_type = Type::BenEater;
     }
 
-    loadFile(settings.value("lastOpenedFile").toString());
-    const QString lastOutputDevice = settings.value("lastOutputDevice").toString();
+    loadFile(settings.value(s_settingsKeyLastFile).toString());
+    const QString lastOutputDevice = settings.value(s_settingsKeyLastOutput).toString();
     if (isSerialPort(lastOutputDevice) || m_modem->audioOutputDevices().contains(lastOutputDevice)) {
         m_outputSelect->setCurrentText(lastOutputDevice);
     }
     if (isSerialPort(m_outputSelect->currentText())) {
-        m_baudSelect->setCurrentText(QString::number(settings.value("serialBaudRate", 115200).toInt()));
+        m_baudSelect->setCurrentText(QString::number(settings.value(s_settingsKeySerialBaudRate, 115200).toInt()));
     } else if (m_modem->audioAvailable()) {
-        m_baudSelect->setCurrentText(QString::number(settings.value("modemBaudRate", 300).toInt()));
+        m_baudSelect->setCurrentText(QString::number(settings.value(s_settingsKeyModemBaudRate, 300).toInt()));
         m_modem->setBaud(m_baudSelect->currentText().toInt());
     }
-    int markFreq = settings.value("markFreq", 0).toInt();
+    int markFreq = settings.value(s_settingsKeyMarkFreq, 0).toInt();
     if (markFreq <= 0) {
         markFreq = 2225;
     }
     qDebug() << "loaded" << markFreq;
     m_markFreq->setValue(markFreq);
-    int spaceFreq = settings.value("spaceFreq", 0).toInt();
+    int spaceFreq = settings.value(s_settingsKeySpaceFreq, 0).toInt();
     if (spaceFreq <= 0) {
        spaceFreq = 2025;
     }
@@ -291,10 +296,10 @@ void Editor::onTypeChanged()
     switch(m_typeDropdown->currentIndex()) {
     case 0:
         m_type = Type::BenEater;
-        settings.setValue("Type", "Original");
+        settings.setValue(s_settingsKeyType, s_settingsValOrig);
         break;
     case 1:
-        settings.setValue("Type", "Extended");
+        settings.setValue(s_settingsKeyType, s_settingsValExt);
         m_type = Type::ExtendedMemory;
         break;
     }
@@ -394,7 +399,7 @@ bool Editor::loadFile(const QString &path)
 
     m_currentFile = path;
     QSettings settings;
-    settings.setValue("lastOpenedFile", path);
+    settings.setValue(s_settingsKeyLastFile, path);
     qDebug() << "Loaded" << path;
     return true;
 }
@@ -519,12 +524,12 @@ void Editor::onOutputChanged(const QString &outputName)
 {
     qDebug() << outputName;
     QSettings settings;
-    settings.setValue("lastOutputDevice", outputName);
+    settings.setValue(s_settingsKeyLastOutput, outputName);
 
     if (isSerialPort(m_outputSelect->currentText())) {
-        m_baudSelect->setCurrentText(QString::number(settings.value("serialBaudRate", 115200).toInt()));
+        m_baudSelect->setCurrentText(QString::number(settings.value(s_settingsKeySerialBaudRate, 115200).toInt()));
     } else if (m_modem->audioAvailable()) {
-        m_baudSelect->setCurrentText(QString::number(settings.value("modemBaudRate", 300).toInt()));
+        m_baudSelect->setCurrentText(QString::number(settings.value(s_settingsKeyModemBaudRate, 300).toInt()));
     }
 
 }
@@ -547,9 +552,9 @@ void Editor::onBaudChanged(QString baudString)
     QSettings settings;
 
     if (isSerialPort(m_outputSelect->currentText())) {
-        settings.setValue("serialBaudRate", baud);
+        settings.setValue(s_settingsKeySerialBaudRate, baud);
     } else if (m_modem->audioOutputDevices().contains(m_outputSelect->currentText())) {
-        settings.setValue("modemBaudRate", baud);
+        settings.setValue(s_settingsKeyModemBaudRate, baud);
         m_modem->setBaud(baud);
     }
 }
@@ -567,8 +572,8 @@ void Editor::onFrequencyChanged()
     m_modem->setFrequencies(space, mark);
 
     QSettings settings;
-    settings.setValue("spaceFreq", space);
-    settings.setValue("markFreq", mark);
+    settings.setValue(s_settingsKeySpaceFreq, space);
+    settings.setValue(s_settingsKeyMarkFreq, mark);
 
 }
 
@@ -628,7 +633,7 @@ bool Editor::save()
         }
     }
     QSettings settings;
-    settings.setValue("lastOpenedFile", m_currentFile);
+    settings.setValue(s_settingsKeyLastFile, m_currentFile);
 
     file.write(m_asmEdit->toPlainText().toUtf8());
     file.commit();
