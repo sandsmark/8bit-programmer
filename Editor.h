@@ -62,6 +62,9 @@ public:
     Editor(QWidget *parent = nullptr);
     ~Editor();
 
+public slots:
+    void onDevicesUpdated(const QStringList &devices);
+    
 signals:
     void sendData(const QByteArray &data);
 

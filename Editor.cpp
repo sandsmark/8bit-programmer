@@ -41,6 +41,17 @@ bool Editor::isSerialPort(const QString &name)
     return !QSerialPortInfo(serialPort).isNull();
 }
 
+void Editor::onDevicesUpdated(const QStringList &devices)
+{
+    QString selectedDevice = m_serialPort->currentText();
+    m_serialPort->clear();
+    m_serialPort->addItems(devices);
+    int newIndex = m_serialPort->findText(selectedDevice);
+    if (newIndex != -1) {
+        m_serialPort->setCurrentIndex(newIndex);
+    }
+}
+
 Editor::Editor(QWidget *parent)
     : QWidget(parent),
     m_ops {
@@ -261,7 +272,8 @@ Editor::Editor(QWidget *parent)
     connect(m_markFreq, &QSpinBox::textChanged, this, &Editor::onFrequencyChanged); // valueChanged is fucked because wtf qt
     connect(volumeSlider, &QSlider::valueChanged, this, &Editor::setVolume);
     connect(refreshButton, &QPushButton::clicked, m_modem, &Modem::updateAudioDevices);
-    connect(m_modem, &Modem::devicesUpdated, this, [this](const QStringList &devices) { m_serialPort->clear(); m_serialPort->addItems(devices); });
+    connect(m_modem, &Modem::devicesUpdated, this, &Editor::onDevicesUpdated);
+    connect(m_serialPort, &QComboBox::textActivated, this, &Editor::onOutputChanged);
 
     volumeSlider->setValue(settings.value(s_settingsKeyVolume, 100).toInt());
 
