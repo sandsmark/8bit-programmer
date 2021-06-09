@@ -106,7 +106,10 @@ void Modem::send(const QByteArray &bytes)
     }
 
     const bool wasEmpty = m_buffer->isEmpty();
-    m_buffer->appendBytes(bytes);
+    for (int i=0; i<bytes.count(); i++) {
+        m_buffer->appendBytes(bytes.mid(i, 1));
+    }
+//    m_buffer->appendBytes(bytes.mid(0, 2));
 
     lock.unlock();
     if (wasEmpty && !ma_device_is_started(m_device.get())) {
