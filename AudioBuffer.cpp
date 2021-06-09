@@ -6,12 +6,13 @@
 #include <math.h>
 
 // Start and end with carrier, since soundcards have a tendency to be noisy when starting/stopping
-static constexpr int s_carrierPrefix = 100; // Prefix with 100 bits of carrier tone
-static constexpr int s_carrierSuffix = 100; // End with 100 bits of carrier tone
+static constexpr int s_carrierPrefix = 10; // Prefix with 100 bits of carrier tone
+static constexpr int s_carrierSuffix = 10; // End with 100 bits of carrier tone
 
 void AudioBuffer::appendBytes(const QByteArray &bytes)
 {
     m_sendBuffer.append(bytes);
+    qDebug() << "Using waveform" << waveform;
 
     const int samplesPerBit = sampleRate / baud; // idklol, i think this is right
     const int prefixLength = s_carrierPrefix * samplesPerBit;
@@ -20,35 +21,35 @@ void AudioBuffer::appendBytes(const QByteArray &bytes)
     QVector<float> newAudio(m_sendBuffer.count() * bitsPerByte * samplesPerBit + prefixLength + suffixLength);
 
     // We fade in, since that seems to help avoiding the noise from the soundcard
-    const float originalVolume = volume;
     qDebug() << "Prefix frame length" << prefixLength << "frames per bit" << samplesPerBit << sampleRate;
+    qDebug() << "Advance for space:" <<  double(frequency(AnsweringSpace)) / sampleRate << "advance for mark" << double(frequency(AnsweringMark)) / sampleRate;
 
     m_bitNum = 10; // im lazy, > 9 makes advance() take the next byte
-    m_time = 0.;
 
     m_currentTone = AnsweringMark; // Carrier is the mark
     int position = 0;
     for (position=0; position<prefixLength; position += samplesPerBit) {
-        volume = position > 0 ? originalVolume * pow(float(position) / prefixLength, 2) : 0;
         generateSound(&newAudio.data()[position], samplesPerBit);
+        printf("%d ", m_currentTone == AnsweringMark ? 1 : 0);
     }
 
-    volume = originalVolume;
     for (; position<newAudio.size() - suffixLength; position += samplesPerBit) {
         if (!advance()) {
             qWarning() << "audio buffer too big" << position;
             break;
         }
         generateSound(&newAudio.data()[position], samplesPerBit);
+
+        printf("%d ", m_currentTone == AnsweringMark ? 1 : 0);
     }
 
     m_currentTone = AnsweringMark; // Keep some carrier, less abrupt end
 
     for (int it=samplesPerBit; position<newAudio.size(); position += samplesPerBit, it += samplesPerBit) {
-        volume = originalVolume * pow(1. - float(it) / suffixLength, 2);
         generateSound(&newAudio.data()[position], samplesPerBit);
+        printf("%d ", m_currentTone == AnsweringMark ? 1 : 0);
     }
-    volume = originalVolume;
+    puts("");
 
     m_audio.append(newAudio);
 
