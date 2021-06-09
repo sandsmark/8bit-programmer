@@ -60,6 +60,8 @@ Random stuff I use or have used (because bookmarks are overrated):
  - http://www.vk2zay.net/calculators/lm567.php
  - https://electronics.stackexchange.com/questions/441501/fsk-generation-with-timer-555
 
+*Heads up: if you use an LM567 chip, remember that the max switching speed is center frequency/20, so adjust your baud to approx. lowest frequency to use / 16. If you use the Bell 103 standard that means max 110 baud.*
+
 
 Dependencies
 ------------
