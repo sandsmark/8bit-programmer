@@ -13,7 +13,6 @@
 struct ma_device;
 struct ma_device_info;
 struct ma_context;
-struct ma_waveform;
 
 class Modem : public QObject
 {
@@ -54,7 +53,6 @@ private:
 
     std::unique_ptr<ma_context> m_maContext;
     std::unique_ptr<ma_device> m_device;
-    std::unique_ptr<ma_waveform> m_waveform;
     float m_volume = 1.0f;
 
     QElapsedTimer m_clock;
