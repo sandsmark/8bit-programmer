@@ -21,10 +21,12 @@ void AudioBuffer::appendBytes(const QByteArray &bytes)
     QVector<float> newAudio(m_sendBuffer.count() * bitsPerByte * samplesPerBit + prefixLength + suffixLength);
 
     // We fade in, since that seems to help avoiding the noise from the soundcard
-    qDebug() << "Prefix frame length" << prefixLength << "frames per bit" << samplesPerBit << sampleRate;
+    qDebug() << "Prefix frame length" << prefixLength << ", audio frames per bit:" << samplesPerBit << ", sample rate:" << sampleRate;
     qDebug() << "Advance for space:" <<  double(frequency(AnsweringSpace)) / sampleRate << "advance for mark" << double(frequency(AnsweringMark)) / sampleRate;
 
     m_bitNum = 10; // im lazy, > 9 makes advance() take the next byte
+
+    printf("Bits: ");
 
     m_currentTone = AnsweringMark; // Carrier is the mark
     int position = 0;

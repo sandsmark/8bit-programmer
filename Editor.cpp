@@ -1,5 +1,6 @@
 #include "Editor.h"
 #include "Modem.h"
+#include "CodeTextEdit.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QPlainTextEdit>
@@ -106,7 +107,7 @@ Editor::Editor(QWidget *parent)
     setLayout(mainLayout);
 
     // Editor
-    m_asmEdit = new QPlainTextEdit;
+    m_asmEdit = new CodeTextEdit(this);
     new SyntaxHighlighter(m_asmEdit->document(), m_ops.keys());
     editorLayout->addWidget(m_asmEdit);
 
@@ -240,8 +241,10 @@ Editor::Editor(QWidget *parent)
     if (lastType == s_settingsValExt) {
         m_type = Type::ExtendedMemory;
         m_typeDropdown->setCurrentIndex(1);
+        m_asmEdit->setBytesPerLine(2);
     } else {
         m_type = Type::BenEater;
+        m_asmEdit->setBytesPerLine(1);
     }
 
     loadFile(settings.value(s_settingsKeyLastFile).toString());
@@ -269,7 +272,7 @@ Editor::Editor(QWidget *parent)
     m_spaceFreq->setValue(spaceFreq);
     m_modem->setFrequencies(spaceFreq, markFreq);
 
-    m_modem->setWaveform(settings.value(s_settingsKeyWaveform, AudioBuffer::Triangle).toInt());
+    m_modem->setWaveform(settings.value(s_settingsKeyWaveform, AudioBuffer::Sine).toInt());
     waveformSelect->setCurrentIndex(m_modem->currentWaveform());
 
     QTimer *timer = new QTimer(this);
@@ -313,10 +316,12 @@ void Editor::onTypeChanged()
     case 0:
         m_type = Type::BenEater;
         settings.setValue(s_settingsKeyType, s_settingsValOrig);
+        m_asmEdit->setBytesPerLine(1);
         break;
     case 1:
         settings.setValue(s_settingsKeyType, s_settingsValExt);
         m_type = Type::ExtendedMemory;
+        m_asmEdit->setBytesPerLine(2);
         break;
     }
     onAsmChanged();
@@ -411,6 +416,7 @@ bool Editor::loadFile(const QString &path)
 
     QSignalBlocker blocker(m_asmEdit); // don't trigger the save timer
     m_asmEdit->setPlainText(QString::fromUtf8(content));
+    m_asmEdit->updateLineNumberAreaWidth();
     onAsmChanged();
 
     m_currentFile = path;
@@ -803,7 +809,6 @@ QString Editor::parseToBinary(const QString &line, int *num)
             // TODO: track line numbers
             const QString otherValue = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(m_memory[address]));
             const QString otherAddressBin = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(address));
-            //return "; Memory address " + QString::number(address) + " (" + otherAddressBin + ") overwrites another value (" + otherValue + ")";
             helpText +=  " WARNING: overwrites another value (" + otherValue + ")!";
         }
         m_memory[address] = binary;
@@ -825,93 +830,4 @@ QString Editor::parseToBinary(const QString &line, int *num)
     }
     return ret;
 //    return QString::asprintf("0x%.2x = 0x%.2x \t; %s = %s", address, binary, addressString.constData(), binaryString.constData());
-}
-
-
-void SyntaxHighlighter::highlightBlock(const QString &text)
-{
-    QTextCharFormat errorFormat;
-    errorFormat.setForeground(Qt::darkRed);
-    errorFormat.setFontWeight(QFont::Bold);
-    setFormat(0, text.length(), errorFormat);
-
-    QTextCharFormat commentFormat;
-    commentFormat.setForeground(Qt::darkGray);
-    QTextCharFormat opcodeFormat;
-    opcodeFormat.setForeground(Qt::darkGreen);
-    QTextCharFormat varFormat;
-    varFormat.setForeground(Qt::darkYellow);
-
-    QTextCharFormat addressFormat;
-    addressFormat.setForeground(Qt::darkMagenta);
-
-    QColor binColor(Qt::darkCyan);
-    QTextCharFormat binFormat1;
-    binFormat1.setForeground(binColor);
-    QTextCharFormat binFormat2;
-    binFormat2.setForeground(binColor.darker(150));
-
-    QTextCharFormat dbFormat;
-    dbFormat.setForeground(Qt::darkBlue);
-
-    QTextCharFormat varNameFormat = varFormat;
-
-    varNameFormat.setFontWeight(QFont::Bold);
-
-    QRegularExpression expression(";.*$");
-    QRegularExpressionMatchIterator i = expression.globalMatch(text);
-    while (i.hasNext()) {
-        QRegularExpressionMatch match = i.next();
-        setFormat(match.capturedStart(), match.capturedLength(), commentFormat);
-    }
-
-    const QString dataRegex("(0x[0-9A-Fa-f]+|[0-9]+)");
-
-    {
-        expression.setPattern("^(\\.db) " + dataRegex + " " + dataRegex + "( [a-zA-Z][a-zA-Z0-9]*)?");
-        i = expression.globalMatch(text);
-        while (i.hasNext()) {
-            QRegularExpressionMatch match = i.next();
-            setFormat(match.capturedStart(1), match.capturedLength(1), dbFormat);
-            setFormat(match.capturedStart(2), match.capturedLength(2), addressFormat);
-            setFormat(match.capturedStart(3), match.capturedLength(3), varFormat);
-            if (match.capturedTexts().count() > 3) {
-                setFormat(match.capturedStart(4), match.capturedLength(4), varNameFormat);
-            }
-        }
-    }
-
-    if (!m_ops.isEmpty()) {
-        expression.setPattern("^\\s*(" + m_ops.join('|') + ")\\b");
-        QRegularExpressionMatchIterator i = expression.globalMatch(text);
-        while (i.hasNext()) {
-            QRegularExpressionMatch match = i.next();
-            setFormat(match.capturedStart(), match.capturedLength(), opcodeFormat);
-        }
-
-        expression.setPattern("^[a-zA-Z ]+" + dataRegex);
-        i = expression.globalMatch(text);
-        while (i.hasNext()) {
-            QRegularExpressionMatch match = i.next();
-            setFormat(match.capturedStart(1), match.capturedLength(1), varFormat);
-        }
-
-        expression.setPattern(" ([a-zA-Z][a-zA-Z0-9]*)$");
-        i = expression.globalMatch(text);
-        while (i.hasNext()) {
-            QRegularExpressionMatch match = i.next();
-            setFormat(match.capturedStart(1), match.capturedLength(1), varNameFormat);
-        }
-    } else {
-        expression.setPattern("([01 ]+):\\s+([01]+)\\s+([01]+)");
-        i = expression.globalMatch(text);
-
-        while (i.hasNext()) {
-            QRegularExpressionMatch match = i.next();
-            setFormat(match.capturedStart(1), match.capturedLength(1), addressFormat);
-            setFormat(match.capturedStart(2), match.capturedLength(2), binFormat1);
-            setFormat(match.capturedStart(3), match.capturedLength(3), binFormat2);
-        }
-
-    }
 }

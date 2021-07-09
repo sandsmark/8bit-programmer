@@ -37,6 +37,9 @@ set(PROJECT_SOURCES
         AudioBuffer.cpp
         AudioBuffer.h
 
+        CodeTextEdit.cpp
+        CodeTextEdit.h
+
         MiniAudio_impl.cpp
 )
 

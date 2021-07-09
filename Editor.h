@@ -3,8 +3,9 @@
 #include <QWidget>
 #include <QHash>
 #include <QMap>
-#include <QSyntaxHighlighter>
 #include <QDebug>
+#include <QFocusEvent>
+#include <QKeyEvent>
 
 #include <QComboBox>
 
@@ -31,23 +32,12 @@ protected:
     }
 };
 
+class CodeTextEdit;
 class QPlainTextEdit;
 class QComboBox;
 class QHBoxLayout;
 class QSpinBox;
 class Modem;
-
-class SyntaxHighlighter : public QSyntaxHighlighter
-{
-    Q_OBJECT
-public:
-    SyntaxHighlighter(QTextDocument *document, const QStringList &ops) : QSyntaxHighlighter(document), m_ops(ops) {}
-
-protected:
-    void highlightBlock(const QString &text) override;
-
-    const QStringList m_ops;
-};
 
 class Editor : public QWidget
 {
@@ -102,7 +92,7 @@ private:
         QString help;
     };
 
-    QPlainTextEdit *m_asmEdit = nullptr;
+    CodeTextEdit *m_asmEdit = nullptr;
     QPlainTextEdit *m_binOutput = nullptr;
     const QHash<QString, Operator> m_ops;
     QMap<uint32_t, uint8_t> m_memory; // qmap is sorted
