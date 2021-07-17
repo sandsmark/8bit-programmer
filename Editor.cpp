@@ -751,7 +751,7 @@ QString Editor::parseToBinary(const QString &line, int *num)
             binary = m_ops[op].opcode << 4;
             (*num)++;
         } else {
-            binary = m_ops[op].opcode << 8;
+            binary = m_ops[op].opcode;
         }
         address = *num;
         helpText = m_ops[op].help;
@@ -787,7 +787,7 @@ QString Editor::parseToBinary(const QString &line, int *num)
         if (m_type == Type::BenEater) {
             binary |= value & 0xF;
         } else {
-            binary |= value & 0xFF;
+            binary |= (value & 0xFF) << 8;
         }
     }
 
