@@ -9,9 +9,10 @@ struct AudioBuffer
 {
     enum Encoding {
         // Just one for now, hardcoded start/stop bits
-        Ascii8N1
+        Ascii8_N_1,
+        Ascii8_1_1
     };
-    Encoding m_encoding = Ascii8N1;
+    Encoding m_encoding = Ascii8_N_1;
     enum Waveform {
         Invalid = -1,
         Square,
@@ -45,7 +46,13 @@ private:
         AnsweringMark,
         AnsweringSpace,
         Silence,
+        Carrier = AnsweringMark,
+        StartBit = AnsweringSpace,
+        StopBit = AnsweringMark,
         ToneCount
+    };
+    enum Bit {
+
     };
 
     inline int frequency(const Tone tone) {

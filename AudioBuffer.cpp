@@ -9,6 +9,20 @@
 static constexpr int s_carrierPrefix = 10; // Prefix with 100 bits of carrier tone
 static constexpr int s_carrierSuffix = 10; // End with 100 bits of carrier tone
 
+static inline bool evenParity(uint8_t byte)
+{
+    // From Bit Twiddling Hacks by Sean Eron Anderson
+    // The method first shifts and XORs the nibbles of the value together, leaving the result in the lowest nibble of `byte`.
+    // Next, the binary number 0110 1001 1001 0110 (0x6996 in hex) is shifted to the right by the value represented in the lowest nibble of `byte`.
+    // This number is like a miniature 16-bit parity-table indexed by the low four bits in `byte`.
+    // The result has the parity of `byte` in bit 1, which is masked and returned.
+    // Thanks to Mathew Hendry for pointing out the shift-lookup idea at the end on Dec. 15, 2002.
+    // That optimization shaves two operations off using only shifting and XORing to find the parity.
+    byte ^= byte >> 4;
+    byte &= 0xF;
+    return (0x6996 >> byte) & 1;
+}
+
 void AudioBuffer::appendBytes(const QByteArray &bytes)
 {
     m_sendBuffer.append(bytes);
@@ -17,7 +31,10 @@ void AudioBuffer::appendBytes(const QByteArray &bytes)
     const int samplesPerBit = sampleRate / baud; // idklol, i think this is right
     const int prefixLength = s_carrierPrefix * samplesPerBit;
     const int suffixLength = s_carrierSuffix * samplesPerBit;
-    const int bitsPerByte = 1 + 8 + 1; // ASCII 8-N-1: 1 start bit, 8 bit data, 1 stop bit
+    int bitsPerByte = 1 + 8 + 1; // ASCII 8-N-1: 1 start bit, 8 bit data, 1 stop bit
+    if (m_encoding == Ascii8_1_1) {
+        bitsPerByte += 1; // Parity bit
+    }
     QVector<float> newAudio(m_sendBuffer.count() * bitsPerByte * samplesPerBit + prefixLength + suffixLength);
 
     // We fade in, since that seems to help avoiding the noise from the soundcard
@@ -28,7 +45,7 @@ void AudioBuffer::appendBytes(const QByteArray &bytes)
 
     printf("Bits: ");
 
-    m_currentTone = AnsweringMark; // Carrier is the mark
+    m_currentTone = Carrier; // Carrier is the mark
     int position = 0;
     for (position=0; position<prefixLength; position += samplesPerBit) {
         generateSound(&newAudio.data()[position], samplesPerBit);
@@ -45,7 +62,7 @@ void AudioBuffer::appendBytes(const QByteArray &bytes)
         printf("%d ", m_currentTone == AnsweringMark ? 1 : 0);
     }
 
-    m_currentTone = AnsweringMark; // Keep some carrier, less abrupt end
+    m_currentTone = Carrier; // Keep some carrier, less abrupt end
 
     for (int it=samplesPerBit; position<newAudio.size(); position += samplesPerBit, it += samplesPerBit) {
         generateSound(&newAudio.data()[position], samplesPerBit);
@@ -224,7 +241,7 @@ void AudioBuffer::generateSound(float *output, size_t frames)
 
 bool AudioBuffer::advance()
 {
-    if (m_bitNum > 9) {
+    if ((m_encoding == Ascii8_N_1 && m_bitNum == 10) || (m_encoding == Ascii8_1_1 && m_bitNum == 11)) {
         if (m_sendBuffer.isEmpty()) {
             qDebug() << "Finito";
             return false;
@@ -235,28 +252,32 @@ bool AudioBuffer::advance()
         m_bitNum = 0;
     }
 
-    if (m_bitNum > 8) {
+
+    if (m_bitNum == 0) {
+        m_currentTone = StartBit;
+    } else if (m_bitNum == 9) {
         switch(m_encoding) {
-        case Ascii8N1:
-            m_currentTone = AnsweringMark;
+        case AudioBuffer::Ascii8_N_1:
+            m_currentTone = StopBit;
             break;
-        default:
-            qWarning() << "Invalid encoding";
-            m_currentTone = AnsweringMark;
+        case AudioBuffer::Ascii8_1_1:
+            m_currentTone = evenParity(m_currentByte) ? AnsweringMark : AnsweringSpace;
             break;
         }
-    } else if (m_bitNum == 0) {
+    } else if (m_bitNum == 10) {
         switch(m_encoding) {
-        case Ascii8N1:
-            m_currentTone = AnsweringSpace;
+        case AudioBuffer::Ascii8_1_1:
+            m_currentTone = StopBit;
             break;
-        default:
-            qWarning() << "Invalid encoding";
-            m_currentTone = AnsweringSpace;
-            break;
+        case AudioBuffer::Ascii8_N_1:
+            qWarning() << "Invalid state for" << m_encoding;
+            return false;
         }
-    } else {
+    } else if (m_bitNum <= 9){
         m_currentTone = (m_currentByte >> (m_bitNum - 1)) & 0b1 ? AnsweringMark : AnsweringSpace;
+    } else {
+        qWarning() << "Invalid state for" << m_encoding << "bit num" << m_bitNum;
+        return false;
     }
     //qDebug() << m_sendBuffer.count() << m_bitNum << m_currentTone;
     m_bitNum++;
