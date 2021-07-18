@@ -142,7 +142,7 @@ Editor::Editor(QWidget *parent)
 
     QHBoxLayout *uploadLayout = new QHBoxLayout;
 
-    m_outputSelect = new QComboBox;
+    m_outputSelect = new DeviceList;
     m_outputSelect->setEnabled(false);
 
     m_modem = new Modem(this);
@@ -168,7 +168,7 @@ Editor::Editor(QWidget *parent)
         uploadButton->setEnabled(true);
         m_outputSelect->setEnabled(true);
     }
-    m_outputSelect->setFixedWidth(200);
+    m_outputSelect->setMinimumWidth(200);
 
     QPushButton *refreshButton = new QPushButton(tr("Refresh"));
 

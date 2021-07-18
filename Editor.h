@@ -8,6 +8,24 @@
 #include <QKeyEvent>
 
 #include <QComboBox>
+#include <QStylePainter>
+
+class DeviceList : public QComboBox
+{
+protected:
+    void paintEvent(QPaintEvent *event) override {
+        QStyleOptionComboBox opt;
+        initStyleOption(&opt);
+
+
+        QStylePainter painter(this);
+        painter.drawComplexControl(QStyle::CC_ComboBox, opt);
+
+        const QRect textRect = style()->subControlRect(QStyle::CC_ComboBox, &opt, QStyle::SC_ComboBoxEditField, this);
+        opt.currentText = painter.fontMetrics().elidedText(opt.currentText, Qt::ElideMiddle, textRect.width());
+        painter.drawControl(QStyle::CE_ComboBoxLabel, opt);
+    }
+};
 
 class BaudEdit : public QComboBox
 {
@@ -98,7 +116,7 @@ private:
     const QHash<QString, Operator> m_ops;
     QMap<uint32_t, uint8_t> m_memory; // qmap is sorted
     QPlainTextEdit *m_memContents = nullptr;
-    QComboBox *m_outputSelect = nullptr;
+    DeviceList *m_outputSelect = nullptr;
 
     QComboBox *m_typeDropdown = nullptr;
 
