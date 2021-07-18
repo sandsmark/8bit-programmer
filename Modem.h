@@ -36,6 +36,8 @@ public:
     void setWaveform(int waveform);
     AudioBuffer::Waveform currentWaveform() const;
 
+    bool isActive() const { return m_isActive; }
+
 public slots:
     void send(const QByteArray &bytes);
     void sendHex(const QByteArray &bytes);
@@ -66,5 +68,6 @@ private:
     std::unique_ptr<AudioBuffer> m_buffer;
 
     QStringList m_outputDeviceList;
+    bool m_isActive = false;
 };
 

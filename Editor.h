@@ -55,6 +55,7 @@ class QPlainTextEdit;
 class QComboBox;
 class QHBoxLayout;
 class QSpinBox;
+class QPushButton;
 class Modem;
 
 class Editor : public QWidget
@@ -80,6 +81,7 @@ private slots:
     void onTypeChanged();
     void onAsmChanged();
     void onUploadClicked();
+    void onUploadFinished();
     bool save();
     void onScrolled();
     void onCursorMoved();
@@ -120,7 +122,9 @@ private:
 
     QComboBox *m_typeDropdown = nullptr;
 
+    QPushButton *m_uploadButton = nullptr;
     QPlainTextEdit *m_serialOutput = nullptr;
+    QPushButton *m_refreshButton = nullptr;
 
     QHash<QString, uint32_t> m_labels;
     QVector<int> m_outputLineNumbers;

@@ -115,6 +115,7 @@ void Modem::send(const QByteArray &bytes)
     if (wasEmpty && !ma_device_is_started(m_device.get())) {
         ma_device_start(m_device.get());
     }
+    m_isActive = true;
 }
 
 void Modem::sendHex(const QByteArray &encoded)
@@ -130,6 +131,8 @@ void Modem::stop()
     Q_ASSERT(QThread::currentThread() == qApp->thread());
 
     ma_device_stop(m_device.get());
+
+    m_isActive = false;
 }
 
 QStringList Modem::audioOutputDevices()

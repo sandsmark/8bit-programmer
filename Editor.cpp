@@ -136,9 +136,10 @@ Editor::Editor(QWidget *parent)
     editorLayout->addWidget(m_binOutput);
 
     // Uploader
-    QPushButton *uploadButton = new QPushButton("Upload (F5)");
-    uploadButton->setShortcut(Qt::Key_F5);
-    uploadButton->setEnabled(false); // Disabled unless there's a serial port available
+    m_uploadButton = new QPushButton("Upload (F5)");
+    m_uploadButton->setShortcut(Qt::Key_F5);
+    m_uploadButton->setEnabled(false); // Disabled unless there's a serial port available
+    m_uploadButton->setCheckable(true);
 
     QHBoxLayout *uploadLayout = new QHBoxLayout;
 
@@ -165,22 +166,22 @@ Editor::Editor(QWidget *parent)
     }
 
     if (m_outputSelect->count() > 0) {
-        uploadButton->setEnabled(true);
+        m_uploadButton->setEnabled(true);
         m_outputSelect->setEnabled(true);
     }
     m_outputSelect->setMinimumWidth(200);
 
-    QPushButton *refreshButton = new QPushButton(tr("Refresh"));
+    m_refreshButton = new QPushButton(tr("Refresh"));
 
     uploadLayout->addWidget(new QLabel("Memory contents:"));
     uploadLayout->addStretch();
 
-    uploadLayout->addWidget(uploadButton);
+    uploadLayout->addWidget(m_uploadButton);
     uploadLayout->addStretch();
 
     uploadLayout->addWidget(new QLabel("Output device:"));
     uploadLayout->addWidget(m_outputSelect);
-    uploadLayout->addWidget(refreshButton);
+    uploadLayout->addWidget(m_refreshButton);
     uploadLayout->addStretch();
     uploadLayout->addWidget(settingsButton);
 
@@ -305,7 +306,7 @@ Editor::Editor(QWidget *parent)
     m_updateTimer->setSingleShot(false);
     connect(m_updateTimer, &QTimer::timeout, this, &Editor::maybeUpdateDevices);
 
-    connect(uploadButton, &QPushButton::clicked, this, &Editor::onUploadClicked);
+    connect(m_uploadButton, &QPushButton::clicked, this, &Editor::onUploadClicked);
     connect(settingsButton, &QPushButton::clicked, this, &Editor::setSettingsVisible);
     connect(newFileButton, &QPushButton::clicked, this, &Editor::onNewFileClicked);
     connect(openFileButton, &QPushButton::clicked, this, &Editor::onLoadFileClicked);
@@ -318,8 +319,9 @@ Editor::Editor(QWidget *parent)
     connect(m_spaceFreq, &QSpinBox::textChanged, this, &Editor::onFrequencyChanged); // valueChanged is fucked because wtf qt
     connect(m_markFreq, &QSpinBox::textChanged, this, &Editor::onFrequencyChanged); // valueChanged is fucked because wtf qt
     connect(volumeSlider, &QSlider::valueChanged, this, &Editor::setVolume);
-    connect(refreshButton, &QPushButton::clicked, m_modem, &Modem::updateAudioDevices);
+    connect(m_refreshButton, &QPushButton::clicked, m_modem, &Modem::updateAudioDevices);
     connect(m_modem, &Modem::devicesUpdated, this, &Editor::onDevicesUpdated);
+    connect(m_modem, &Modem::finished, this, &Editor::onUploadFinished);
     connect(m_outputSelect, &QComboBox::textActivated, this, &Editor::onOutputChanged);
     connect(waveformSelect, qOverload<int>(&QComboBox::currentIndexChanged), this, &Editor::onWaveformSelected);
 
@@ -392,6 +394,22 @@ void Editor::onAsmChanged()
     }
 }
 
+void Editor::onUploadFinished()
+{
+    for (int i=0; i<m_settingsLayout->count(); i++) {
+        QWidget *widget = m_settingsLayout->itemAt(i)->widget();
+        if (!widget) {
+            continue;
+        }
+        widget->setEnabled(true);
+    }
+
+    m_uploadButton->setChecked(false);
+    m_outputSelect->setEnabled(true);
+    m_refreshButton->setEnabled(true);
+    m_updateTimer->start();
+}
+
 void Editor::onUploadClicked()
 {
     // TODO: more configurable, show output received back/get feedback, async so the user can cancel
@@ -399,6 +417,22 @@ void Editor::onUploadClicked()
     const QByteArray data = m_memContents->toPlainText().toLatin1();
 
     if (!isSerialPort(m_outputSelect->currentText())) {
+        if (!m_uploadButton->isChecked()) {
+            m_modem->stop();
+            return;
+        }
+        for (int i=0; i<m_settingsLayout->count(); i++) {
+            QWidget *widget = m_settingsLayout->itemAt(i)->widget();
+            if (!widget) {
+                continue;
+            }
+            widget->setEnabled(false);
+        }
+
+        m_outputSelect->setEnabled(false);
+        m_refreshButton->setEnabled(false);
+        m_updateTimer->stop();
+
         emit sendData(data);
         return;
     }
