@@ -54,7 +54,7 @@ public:
 
 public slots:
     void onDevicesUpdated(const QStringList &devices);
-    
+
 signals:
     void sendData(const QByteArray &data);
 
@@ -74,6 +74,7 @@ private slots:
     void onNewFileClicked();
     void setVolume(const int percent);
     void onWaveformSelected(int waveform);
+    void maybeUpdateDevices();
 
 private:
     static bool isSerialPort(const QString &name);
@@ -117,4 +118,7 @@ private:
     QSpinBox *m_markFreq;
 
     Modem *m_modem;
+
+    // Kind of a hack, but miniaudio doesn't have any callbacks for updating
+    QTimer *m_updateTimer;
 };

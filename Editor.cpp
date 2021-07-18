@@ -24,6 +24,7 @@
 #include <QTextBlock>
 #include <QSpinBox>
 #include <QSlider>
+#include <QWindow>
 
 #include <QtMath>
 
@@ -50,13 +51,31 @@ bool Editor::isSerialPort(const QString &name)
 
 void Editor::onDevicesUpdated(const QStringList &devices)
 {
-    QString selectedDevice = m_outputSelect->currentText();
+    const QString selectedDevice = m_outputSelect->currentText();
     m_outputSelect->clear();
+
+    for (const QSerialPortInfo &portInfo : QSerialPortInfo::availablePorts()) {
+        m_outputSelect->addItem(portInfo.portName());
+    }
+
     m_outputSelect->addItems(devices);
+
     int newIndex = m_outputSelect->findText(selectedDevice);
     if (newIndex != -1) {
         m_outputSelect->setCurrentIndex(newIndex);
     }
+}
+
+void Editor::maybeUpdateDevices()
+{
+    if (!windowHandle()->isExposed()) {
+        return;
+    }
+    if (!isSerialPort(m_outputSelect->currentText())) {
+        m_modem->updateAudioDevices();
+        return;
+    }
+    // TODO: update serial ports
 }
 
 Editor::Editor(QWidget *parent)
@@ -281,6 +300,11 @@ Editor::Editor(QWidget *parent)
     timer->setInterval(500);
     connect(m_asmEdit, &QPlainTextEdit::textChanged, timer, [timer]() { timer->start(); });
 
+    m_updateTimer = new QTimer(this);
+    m_updateTimer->setInterval(1000);
+    m_updateTimer->setSingleShot(false);
+    connect(m_updateTimer, &QTimer::timeout, this, &Editor::maybeUpdateDevices);
+
     connect(uploadButton, &QPushButton::clicked, this, &Editor::onUploadClicked);
     connect(settingsButton, &QPushButton::clicked, this, &Editor::setSettingsVisible);
     connect(newFileButton, &QPushButton::clicked, this, &Editor::onNewFileClicked);
@@ -302,6 +326,8 @@ Editor::Editor(QWidget *parent)
     volumeSlider->setValue(settings.value(s_settingsKeyVolume, 100).toInt());
 
     setSettingsVisible(false);
+
+    m_updateTimer->start();
 }
 
 Editor::~Editor()

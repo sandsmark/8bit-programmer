@@ -48,7 +48,6 @@ signals:
     void devicesUpdated(const QStringList devices);
 
 private:
-
     static void miniaudioCallback(ma_device* device, void *output, const void *input, uint32_t frameCount);
 
     std::unique_ptr<ma_context> m_maContext;

@@ -142,8 +142,6 @@ void Modem::updateAudioDevices()
     // Can only run from one thread, and cannot be run while audio is playing
 
     std::lock_guard<std::recursive_mutex> lock(m_maMutex);
-    m_devices.clear();
-    m_outputDeviceList.clear();
 
     if (!m_maContext) {
         qWarning() << "Audio not available";
@@ -157,6 +155,18 @@ void Modem::updateAudioDevices()
         qWarning() << "Failed to get list of devices";
         return;
     }
+
+    QSet<QString> newDevices;
+    QSet<QString> currentDevices(m_outputDeviceList.begin(), m_outputDeviceList.end());
+    for (size_t i=0; i<devicesCount; i++) {
+        newDevices.insert(QString::fromLocal8Bit(devicesInfo[i].name));
+    }
+    if (currentDevices == newDevices) {
+        return;
+    }
+
+    m_outputDeviceList.clear();
+    m_devices.clear();
 
     QString defaultDevice;
     for (size_t i=0; i<devicesCount; i++) {
