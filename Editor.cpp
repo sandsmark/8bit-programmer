@@ -847,7 +847,11 @@ QString Editor::parseToBinary(const QString &line, int *num)
         if (m_type == Type::BenEater) {
             binary |= value & 0xF;
         } else {
-            binary |= (value & 0xFF) << 8;
+            if (op == ".db") {
+                binary |= (value & 0xFF);
+            } else {
+                binary |= (value & 0xFF) << 8;
+            }
         }
     }
 
@@ -871,7 +875,7 @@ QString Editor::parseToBinary(const QString &line, int *num)
             const QString otherAddressBin = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(address));
             helpText +=  " WARNING: overwrites another value (" + otherValue + ")!";
         }
-        m_memory[address] = binary;
+        m_memory[address] = binary & 0xFF;
 
         ret += QString::asprintf("%s: %s", addressString.constData(), binaryString.constData());
 
@@ -886,6 +890,7 @@ QString Editor::parseToBinary(const QString &line, int *num)
         address++;
         (*num)++;
         binary >>= 8;
+        //m_memory[address] = binary;
         ret += "\n";
     }
     return ret;
