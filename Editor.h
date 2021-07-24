@@ -77,6 +77,9 @@ public slots:
 signals:
     void sendData(const QByteArray &data);
 
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
 private slots:
     void onTypeChanged();
     void onAsmChanged();

@@ -207,6 +207,7 @@ Editor::Editor(QWidget *parent)
     volumeSlider->setMinimum(1);
     volumeSlider->setMaximum(100);
     volumeSlider->setOrientation(Qt::Horizontal);
+    volumeSlider->setMinimumWidth(100);
     m_settingsLayout->addWidget(new QLabel(tr("Volume:")));
     m_settingsLayout->addWidget(volumeSlider);
     m_settingsLayout->addStretch();
@@ -325,16 +326,24 @@ Editor::Editor(QWidget *parent)
     connect(m_outputSelect, &QComboBox::textActivated, this, &Editor::onOutputChanged);
     connect(waveformSelect, qOverload<int>(&QComboBox::currentIndexChanged), this, &Editor::onWaveformSelected);
 
-    volumeSlider->setValue(settings.value(s_settingsKeyVolume, 100).toInt());
+    volumeSlider->setValue(settings.value(s_settingsKeyVolume, 75).toInt());
 
     setSettingsVisible(false);
 
     m_updateTimer->start();
+    restoreGeometry(settings.value("geometry").toByteArray());
 }
 
 Editor::~Editor()
 {
     save();
+}
+
+void Editor::closeEvent(QCloseEvent *event)
+{
+    QSettings settings;
+    settings.setValue("geometry", saveGeometry());
+    QWidget::closeEvent(event);
 }
 
 void Editor::onTypeChanged()
