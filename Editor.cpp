@@ -338,7 +338,7 @@ Editor::Editor(QWidget *parent)
     connect(m_outputSelect, &QComboBox::textActivated, this, &Editor::onOutputChanged);
     connect(m_waveformSelect, qOverload<int>(&QComboBox::currentIndexChanged), this, &Editor::onWaveformSelected);
 
-    m_volumeSlider->setValue(settings.value(s_settingsKeyVolume, 75).toInt());
+    m_volumeSlider->setValue(settings.value(s_settingsKeyVolume, 100).toInt());
 
     connect(new QShortcut(QKeySequence::Quit, this), &QShortcut::activated, qApp, &QCoreApplication::quit);
 
