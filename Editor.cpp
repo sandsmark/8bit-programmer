@@ -26,6 +26,9 @@
 #include <QSlider>
 #include <QWindow>
 #include <QProgressBar>
+#include <QShortcut>
+#include <QKeySequence>
+#include <QCoreApplication>
 
 #include <QtMath>
 
@@ -336,6 +339,8 @@ Editor::Editor(QWidget *parent)
     connect(m_waveformSelect, qOverload<int>(&QComboBox::currentIndexChanged), this, &Editor::onWaveformSelected);
 
     m_volumeSlider->setValue(settings.value(s_settingsKeyVolume, 75).toInt());
+
+    connect(new QShortcut(QKeySequence::Quit, this), &QShortcut::activated, qApp, &QCoreApplication::quit);
 
     setSettingsVisible(false);
 
