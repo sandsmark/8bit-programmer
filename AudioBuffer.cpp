@@ -67,12 +67,12 @@ namespace {
     struct WavHeader {
         // RIFF header
         //uint32_t chunkID;
-        const char chunkID[4] = {'R', 'I', 'F', 'F'};
+        const uint8_t chunkID[4] = {'R', 'I', 'F', 'F'};
         uint32_t chunkSize = 0;
-        const char format[4] = {'W', 'A', 'V', 'E'};
+        const uint8_t format[4] = {'W', 'A', 'V', 'E'};
 
         // fmt subchunk
-        const char subchunk1ID[4] = {'f', 'm', 't', ' '};
+        const uint8_t subchunk1ID[4] = {'f', 'm', 't', ' '};
         const uint32_t subchunk1Size =
             sizeof(audioFormat) +
             sizeof(numChannels) +
@@ -101,7 +101,7 @@ namespace {
         uint16_t bitsPerSample = 0;
 
         // data subchunk
-        const char subchunk2ID[4] = {'d', 'a', 't', 'a'};
+        const uint8_t subchunk2ID[4] = {'d', 'a', 't', 'a'};
         uint32_t subchunk2Size = 0;
 
         bool isValid() const {
@@ -116,6 +116,27 @@ namespace {
                 bitsPerSample &&
                 subchunk2Size;
         };
+
+        template<typename BufferType>
+        void finalize(const BufferType &buffer) {
+            Q_ASSERT(sampleRate > 0);
+            Q_ASSERT(numChannels > 0);
+            Q_ASSERT(buffer.size() > 0);
+
+            if (std::is_floating_point<typename BufferType::value_type>::value) {
+                audioFormat = WavHeader::IEEEFloat;
+            } else {
+                audioFormat = WavHeader::PCM;
+            }
+            bitsPerSample = sizeof(typename BufferType::value_type) * 8;
+            byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+            blockAlign = numChannels * (bitsPerSample / 8);
+            subchunk2Size = buffer.size() * numChannels * (bitsPerSample / 8);
+
+            chunkSize = sizeof(format) +
+                (sizeof(subchunk1ID) + sizeof(subchunk1Size) + subchunk1Size) +
+                (sizeof(subchunk2ID) + sizeof(subchunk2Size) + subchunk2Size);
+        }
     };
 } // namespace
 
@@ -136,21 +157,9 @@ bool AudioBuffer::saveWavFile(const QString &filename)
         return false;
     }
     WavHeader header;
-    if (std::is_floating_point<decltype(m_audio)::value_type>::value) {
-        header.audioFormat = WavHeader::IEEEFloat;
-    } else {
-        header.audioFormat = WavHeader::PCM;
-    }
     header.numChannels = channels;
     header.sampleRate = sampleRate;
-    header.bitsPerSample = sizeof(decltype(m_audio)::value_type) * 8;
-    header.byteRate = header.sampleRate * header.numChannels * (header.bitsPerSample / 8);
-    header.blockAlign = header.numChannels * (header.bitsPerSample / 8);
-
-    header.subchunk2Size = m_audio.size() * header.numChannels * (header.bitsPerSample / 8);
-    header.chunkSize = sizeof(header.format) +
-        (sizeof(header.subchunk1ID) + sizeof(header.subchunk1Size) + header.subchunk1Size) +
-        (sizeof(header.subchunk2ID) + sizeof(header.subchunk2Size) + header.subchunk2Size);
+    header.finalize(m_audio);
 
     Q_ASSERT(*(const uint32_t*)(header.chunkID) == 0x46464952);
     Q_ASSERT(*(const uint32_t*)(header.subchunk1ID) == 0x20746d66);
