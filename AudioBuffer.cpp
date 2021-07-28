@@ -82,6 +82,12 @@ void AudioBuffer::appendBytes(const QByteArray &bytes)
 
 namespace {
     struct WavHeader {
+        WavHeader(const uint32_t sampleRate_, const uint16_t numChannels_) :
+            sampleRate(sampleRate_),
+            numChannels(numChannels_)
+        {}
+
+    private:
         // RIFF header
         //uint32_t chunkID;
         const uint8_t chunkID[4] = {'R', 'I', 'F', 'F'};
@@ -121,6 +127,7 @@ namespace {
         const uint8_t subchunk2ID[4] = {'d', 'a', 't', 'a'};
         uint32_t subchunk2Size = 0;
 
+    public:
         bool isValid() const {
             return
                 chunkSize &&
@@ -154,6 +161,32 @@ namespace {
                 (sizeof(subchunk1ID) + sizeof(subchunk1Size) + subchunk1Size) +
                 (sizeof(subchunk2ID) + sizeof(subchunk2Size) + subchunk2Size);
         }
+
+        template<typename BufferType>
+        void finalize(const BufferType &buffer) {
+            Q_ASSERT(sampleRate > 0);
+            Q_ASSERT(numChannels > 0);
+            Q_ASSERT(buffer.size() > 0);
+
+            if (std::is_floating_point<typename BufferType::value_type>::value) {
+                audioFormat = WavHeader::IEEEFloat;
+            } else {
+                audioFormat = WavHeader::PCM;
+            }
+            bitsPerSample = sizeof(typename BufferType::value_type) * 8;
+            byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+            blockAlign = numChannels * (bitsPerSample / 8);
+            subchunk2Size = buffer.size() * numChannels * (bitsPerSample / 8);
+
+            chunkSize = sizeof(format) +
+                (sizeof(subchunk1ID) + sizeof(subchunk1Size) + subchunk1Size) +
+                (sizeof(subchunk2ID) + sizeof(subchunk2Size) + subchunk2Size);
+
+            Q_ASSERT(*(const uint32_t*)(chunkID) == 0x46464952);
+            Q_ASSERT(*(const uint32_t*)(subchunk1ID) == 0x20746d66);
+            Q_ASSERT(*(const uint32_t*)(subchunk2ID) == 0x61746164);
+            Q_ASSERT(chunkSize == 36 + subchunk2Size);
+        }
     };
 } // namespace
 
@@ -173,15 +206,9 @@ bool AudioBuffer::saveWavFile(const QString &filename)
         qWarning() << "Failed to open" << filename << "for writing";
         return false;
     }
-    WavHeader header;
-    header.numChannels = channels;
-    header.sampleRate = sampleRate;
-    header.finalize(m_audio);
 
-    Q_ASSERT(*(const uint32_t*)(header.chunkID) == 0x46464952);
-    Q_ASSERT(*(const uint32_t*)(header.subchunk1ID) == 0x20746d66);
-    Q_ASSERT(*(const uint32_t*)(header.subchunk2ID) == 0x61746164);
-    Q_ASSERT(header.chunkSize == 36 + header.subchunk2Size);
+    WavHeader header(sampleRate, channels);
+    header.finalize(m_audio);
 
     Q_ASSERT(header.isValid());
 
