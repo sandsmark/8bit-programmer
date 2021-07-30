@@ -46,8 +46,7 @@ bool Editor::isSerialPort(const QString &name)
     if (name.isEmpty()) {
         return false;
     }
-    QSerialPort serialPort(name);
-    return !QSerialPortInfo(serialPort).isNull();
+    return !QSerialPortInfo(name).isNull();
 }
 
 void Editor::onDevicesUpdated(const QStringList &devices)
