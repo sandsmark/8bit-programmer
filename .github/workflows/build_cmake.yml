@@ -60,8 +60,12 @@ jobs:
         mkdir 8bit-programmer
         move 8bit-programmer.exe 8bit-programmer\
         cd 8bit-programmer
+        g++
         windeployqt --compiler-runtime --no-translations 8bit-programmer.exe
         cd ..
+        copy "%Qt5_Dir%\bin\libstdc++-6.dll" 8bit-programmer
+        copy "%Qt5_Dir%\bin\libwinpthread-1.dll" 8bit-programmer
+        copy "%Qt5_Dir%\bin\libgcc_s_seh-1.dll" 8bit-programmer
         7z a 8bit-programmer-v%GITHUB_RUN_NUMBER%.zip 8bit-programmer\*
 
 
