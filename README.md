@@ -25,7 +25,7 @@ Downloads
 
 Windows builds can be found here, just download the zip file with the highest number:
 
-https://github.com/sandsmark/8bit-programmer/releases/tag/1
+https://github.com/sandsmark/8bit-programmer/releases/tag/64
 
 Opcodes
 -------
