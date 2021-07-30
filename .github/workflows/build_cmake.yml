@@ -76,11 +76,16 @@ jobs:
         copy "README.md" 8bit-programmer
         7z a 8bit-programmer-v%GITHUB_RUN_NUMBER%.zip 8bit-programmer\*
         cd /d "%VCINSTALLDIR%"
-        dir /s MSVCP140.dll
         dir /s api-ms-win-crt-runtime-l1-1-0.dll
+        dir /s NETAPI32.dll
+        dir /s iphlpapi.dll
         dir /s nsi.dll
-        cd /d "%Qt5_Dir%"
-        dir /s "*.dll"
+
+        cd /d "%WindowsSdkDir%"
+        dir /s api-ms-win-crt-runtime-l1-1-0.dll
+        dir /s NETAPI32.dll
+        dir /s iphlpapi.dll
+        dir /s nsi.dll
 
 
     - uses: ncipollo/release-action@v1
