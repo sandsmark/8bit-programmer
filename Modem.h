@@ -11,7 +11,6 @@
 #include <mutex>
 
 struct ma_device;
-struct ma_device_info;
 struct ma_context;
 
 class Modem : public QObject
@@ -45,27 +44,30 @@ public slots:
     void updateAudioDevices();
 
 signals:
+    void stopped();
     void finished();
     void devicesUpdated(const QStringList devices);
+    void progress(int percent);
 
 private:
-    static void miniaudioCallback(ma_device* device, void *output, const void *input, uint32_t frameCount);
+    static void freeDevice(ma_device *dev);
+    static void maDataCallback(ma_device* device, void *output, const void *input, uint32_t frameCount);
+    static void maStoppedCallback(ma_device *device);
 
     std::unique_ptr<ma_context> m_maContext;
-    std::unique_ptr<ma_device> m_device;
+    std::unique_ptr<ma_device, decltype(&Modem::freeDevice)> m_device;
     float m_volume = 1.0f;
-
-    QElapsedTimer m_clock;
 
     // tsan doesn't support qmutex, unfortunately, so we eat the sour apple and use the ugly std APIs
     std::recursive_mutex m_maMutex;
 
-    QHash<QString, std::shared_ptr<ma_device_info>> m_devices;
     QString m_currentDevice;
 
     std::unique_ptr<AudioBuffer> m_buffer;
 
     QStringList m_outputDeviceList;
     bool m_isActive = false;
+
+    int m_framesToSend = 0;
 };
 

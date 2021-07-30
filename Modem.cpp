@@ -12,11 +12,11 @@
 #define MA_NO_OPENAL
 #include <miniaudio/miniaudio.h>
 
-#define DEVICE_FORMAT       ma_format_f32
-#define DEVICE_CHANNELS     1
-#define DEVICE_SAMPLE_RATE 48000
+#define DEFAULT_FORMAT       ma_format_f32
+#define DEFAULT_SAMPLERATE  44100
 
-Modem::Modem(QObject *parent) : QObject(parent)
+Modem::Modem(QObject *parent) : QObject(parent),
+    m_device(nullptr, &Modem::freeDevice)
 {
     Q_ASSERT(QThread::currentThread() == qApp->thread());
 
@@ -36,9 +36,6 @@ Modem::~Modem()
 {
     Q_ASSERT(QThread::currentThread() == qApp->thread());
 
-    if (m_device) {
-        ma_device_uninit(m_device.get());
-    }
     if (m_maContext) {
         ma_context_uninit(m_maContext.get());
     }
@@ -46,11 +43,65 @@ Modem::~Modem()
     std::lock_guard<std::recursive_mutex> lock(m_maMutex);
 }
 
+static bool getDeviceInfo(ma_context *context, const QByteArray &name, ma_device_info *info)
+{
+    ma_device_info* devicesInfo;
+    ma_uint32 devicesCount;
+    if (ma_context_get_devices(context, &devicesInfo, &devicesCount, nullptr, nullptr) != MA_SUCCESS) {
+        return false;
+    }
+
+    for (size_t i=0; i<devicesCount; i++) {
+        if (devicesInfo[i].name != name) {
+            continue;
+        }
+        if (ma_context_get_device_info(context, ma_device_type_playback, &devicesInfo[i].id, ma_share_mode_shared, info) == MA_SUCCESS) {
+            return true;
+        }
+        // Idk, maybe there are more with the same name?
+//        return false;
+    }
+
+    return false;
+}
+
+#if 0 // we're not supposed to use nativeDataFormats
+static void findBestFormat(const ma_device_info &info, uint32_t *sampleRate, ma_format *sampleFormat)
+{
+    for (uint32_t i=0; i<info.nativeDataFormatCount; i++) {
+        if (info.nativeDataFormats[i].sampleRate < *sampleRate) {
+            continue;
+        }
+        *sampleRate = info.nativeDataFormats[i].sampleRate;
+        *sampleFormat = info.nativeDataFormats[i].format;
+    }
+}
+#endif
+
+void Modem::freeDevice(ma_device *dev)
+{
+    if (!dev) {
+        return;
+    }
+    ma_device_uninit(dev);
+    delete dev;
+}
+
 bool Modem::initAudio(const QString &deviceName)
 {
+    if (!m_outputDeviceList.contains(deviceName)) {
+        qWarning() << "Invalid device" << deviceName;
+        return false;
+    }
+    qDebug() << "Initing audio to" << deviceName;
     Q_ASSERT(QThread::currentThread() == qApp->thread());
 
     std::lock_guard<std::recursive_mutex> lock(m_maMutex);
+
+    if (!audioAvailable()) {
+        qDebug() << "Audio not available!";
+        return false;
+    }
 
     if (m_currentDevice == deviceName && m_device) {
         return true;
@@ -61,23 +112,29 @@ bool Modem::initAudio(const QString &deviceName)
         return false;
     }
 
-    if (m_device) {
-        ma_device_uninit(m_device.get());
-    }
-    m_device = std::make_unique<ma_device>();
+    m_device.reset(new ma_device);
+    m_device->onStop = &Modem::maStoppedCallback;
 
     ma_device_config deviceConfig;
     deviceConfig = ma_device_config_init(ma_device_type_playback);
+    deviceConfig.playback.channels = 1;
+    deviceConfig.playback.format   = DEFAULT_FORMAT;
+    deviceConfig.sampleRate        = DEFAULT_SAMPLERATE;
 
-    if (!deviceName.isEmpty() && m_devices.contains(deviceName)) {
-        deviceConfig.playback.pDeviceID = &m_devices[deviceName]->id;
-        qDebug() << "Using device" << m_devices[deviceName]->name;
+    ma_device_info deviceInfo;
+    if (!deviceName.isEmpty() && getDeviceInfo(m_maContext.get(), deviceName.toLocal8Bit(), &deviceInfo)) {
+        deviceConfig.playback.pDeviceID = &deviceInfo.id;
+//        if (deviceInfo.formatCount > 0) {
+//            deviceConfig.playback.format = deviceInfo.formats[0];
+//        }
+
+        deviceConfig.sampleRate = deviceInfo.maxSampleRate;
+
+        qDebug() << "Device:" << deviceInfo.name << "min sample rate" << deviceInfo.minSampleRate << "max sample rate" << deviceInfo.maxSampleRate << "Formats:" << deviceInfo.formatCount;
     }
 
-    deviceConfig.playback.format   = DEVICE_FORMAT;
-    deviceConfig.playback.channels = DEVICE_CHANNELS;
-    deviceConfig.sampleRate        = DEVICE_SAMPLE_RATE;
-    deviceConfig.dataCallback      = &Modem::miniaudioCallback;
+    deviceConfig.dataCallback      = &Modem::maDataCallback;
+    deviceConfig.stopCallback      = &Modem::maStoppedCallback;
     deviceConfig.pUserData         = this;
 
     if (ma_device_init(m_maContext.get(), &deviceConfig, m_device.get()) != MA_SUCCESS) {
@@ -85,11 +142,9 @@ bool Modem::initAudio(const QString &deviceName)
         return false;
     }
 
-    m_buffer->sampleRate = deviceConfig.sampleRate;
+    m_buffer->sampleRate = int(deviceConfig.sampleRate);
 
-    qDebug() << "Got device" << m_device->playback.name << "sample rate" << m_buffer->sampleRate;
-
-    m_clock.start();
+    qDebug() << "Got device" << m_device->playback.name << "sample rate" << m_buffer->sampleRate << "format" << ma_get_format_name(m_device->playback.format);
 
     m_currentDevice = deviceName;
 
@@ -109,7 +164,7 @@ void Modem::send(const QByteArray &bytes)
     for (int i=0; i<bytes.count(); i++) {
         m_buffer->appendBytes(bytes.mid(i, 1));
     }
-//    m_buffer->appendBytes(bytes.mid(0, 2));
+    m_framesToSend = m_buffer->frameCount();
 
     lock.unlock();
     if (wasEmpty && !ma_device_is_started(m_device.get())) {
@@ -122,7 +177,6 @@ void Modem::sendHex(const QByteArray &encoded)
 {
     Q_ASSERT(QThread::currentThread() == qApp->thread());
 
-    std::lock_guard<std::recursive_mutex> lock(m_maMutex);
     send(QByteArray::fromHex(encoded));
 }
 
@@ -133,6 +187,11 @@ void Modem::stop()
     ma_device_stop(m_device.get());
 
     m_isActive = false;
+
+    emit stopped();
+
+    std::lock_guard<std::recursive_mutex> lock(m_maMutex);
+    m_buffer->clear();
 }
 
 QStringList Modem::audioOutputDevices()
@@ -159,19 +218,8 @@ void Modem::updateAudioDevices()
         return;
     }
 
-    QSet<QString> newDevices;
-    QSet<QString> currentDevices(m_outputDeviceList.begin(), m_outputDeviceList.end());
-    for (size_t i=0; i<devicesCount; i++) {
-        newDevices.insert(QString::fromLocal8Bit(devicesInfo[i].name));
-    }
-    if (currentDevices == newDevices) {
-        return;
-    }
-
     m_outputDeviceList.clear();
-    m_devices.clear();
 
-    QString defaultDevice;
     for (size_t i=0; i<devicesCount; i++) {
         const QString name = QString::fromLocal8Bit(devicesInfo[i].name);
         if (devicesInfo[i].isDefault) {
@@ -179,7 +227,6 @@ void Modem::updateAudioDevices()
         } else {
             m_outputDeviceList.append(name);
         }
-        m_devices[name] = std::make_shared<ma_device_info>(devicesInfo[i]);
     }
     emit devicesUpdated(m_outputDeviceList);
 }
@@ -200,6 +247,10 @@ void Modem::setSampleRate(const int /*rate*/)
 void Modem::setFrequencies(const int space, const int mark)
 {
     Q_ASSERT(QThread::currentThread() == qApp->thread());
+    if (space <= 0 || mark <= 0) {
+        qWarning() << "Invalid frequencies" << space << mark;
+        return;
+    }
 
     m_buffer->spaceFrequency = space;
     m_buffer->markFrequency = mark;
@@ -209,7 +260,7 @@ void Modem::setVolume(const float volume)
 {
     Q_ASSERT(QThread::currentThread() == qApp->thread());
 
-    static constexpr qreal loudnessToVoltage = qreal(0.67);
+    static constexpr double loudnessToVoltage = qreal(0.67);
     m_buffer->volume = qBound(0., pow(volume, loudnessToVoltage) , 1.);
 }
 
@@ -227,7 +278,7 @@ void Modem::setWaveform(int waveform)
     m_buffer->waveform = AudioBuffer::Waveform(waveform);
 }
 
-void Modem::miniaudioCallback(ma_device *device, void *output, const void *input, uint32_t frameCount)
+void Modem::maDataCallback(ma_device *device, void *output, const void *input, uint32_t frameCount)
 {
     Q_UNUSED(input);
 
@@ -235,7 +286,22 @@ void Modem::miniaudioCallback(ma_device *device, void *output, const void *input
     std::lock_guard<std::recursive_mutex> lock(that->m_maMutex);
 
     that->m_buffer->takeFrames(frameCount, output);
+
     if (that->m_buffer->isEmpty()) {
+        emit that->progress(100);
         emit that->finished();
+    } else {
+        emit that->progress(100 - (100 * that->m_buffer->frameCount() / that->m_framesToSend));
     }
+}
+
+// Does not seem to get called
+void Modem::maStoppedCallback(ma_device *device)
+{
+    Q_UNUSED(device);
+#if 0
+    Modem *that = reinterpret_cast<Modem*>(device->pUserData);
+    qDebug() << "Stopped";
+    emit that->stopped();
+#endif
 }
