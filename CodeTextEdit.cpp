@@ -88,16 +88,24 @@ void CodeTextEdit::lineNumberAreaPaintEvent(QPaintEvent *event)
     int top = qRound(blockBoundingGeometry(block).translated(contentOffset()).top());
     int bottom = top + qRound(blockBoundingRect(block).height());
     int bytes = 0;
+
+    QRegularExpression labelRegex("^\\s*([a-zA-Z][a-zA-Z0-9]*:)\\s*(;.*)?$");
+
     while (block.isValid() && top <= event->rect().bottom()) {
-        if (block.isVisible() && bottom >= event->rect().top()) {
+        const QString lineContent = block.text().trimmed();
+        const bool isEmpty =
+                lineContent.isEmpty() ||
+                lineContent.startsWith(';') ||
+                lineContent.startsWith(".db") ;
+
+        if (!isEmpty && block.isVisible() && bottom >= event->rect().top()) {
             QString number = QString::number(bytes);
             painter.setPen(Qt::black);
             painter.drawText(0, top, lineNumberArea->width(), fontMetrics().height(),
                              Qt::AlignRight, number);
         }
 
-        const QString lineContent = block.text().trimmed();
-        if (!lineContent.isEmpty() && !lineContent.startsWith(';') && !lineContent.startsWith(".db")) {
+        if (!isEmpty && !lineContent.contains(labelRegex)) {
             bytes += bytesPerLine;
         }
 
