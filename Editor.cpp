@@ -315,11 +315,6 @@ Editor::Editor(QWidget *parent)
     timer->setInterval(500);
     connect(m_asmEdit, &QPlainTextEdit::textChanged, timer, [timer]() { timer->start(); });
 
-    m_updateTimer = new QTimer(this);
-    m_updateTimer->setInterval(1000);
-    m_updateTimer->setSingleShot(false);
-    connect(m_updateTimer, &QTimer::timeout, this, &Editor::maybeUpdateDevices);
-
     connect(m_uploadButton, &QPushButton::clicked, this, &Editor::onUploadClicked);
     connect(settingsButton, &QPushButton::clicked, this, &Editor::setSettingsVisible);
     connect(newFileButton, &QPushButton::clicked, this, &Editor::onNewFileClicked);
@@ -344,7 +339,6 @@ Editor::Editor(QWidget *parent)
 
     setSettingsVisible(false);
 
-    m_updateTimer->start();
     restoreGeometry(settings.value("geometry").toByteArray());
 }
 
