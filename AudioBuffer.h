@@ -22,10 +22,12 @@ struct AudioBuffer
     };
     Waveform waveform = Triangle;
 
-    void takeFrames(int frameCount, void *output);
+    int frameCount() const { return m_audio.size(); }
+    void takeFrames(uint32_t frameCount, void *output);
     bool isEmpty() const { return m_audio.isEmpty(); }
     void appendBytes(const QByteArray &bytes);
     bool saveWavFile(const QString &filename);
+    void clear() { m_audio.clear(); }
 
     int channels = 1;
     int sampleRate = 44100;

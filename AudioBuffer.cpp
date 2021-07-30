@@ -254,9 +254,9 @@ bool AudioBuffer::advance()
     return true;
 }
 
-void AudioBuffer::takeFrames(int frameCount, void *output)
+void AudioBuffer::takeFrames(uint32_t frameCount, void *output)
 {
-    const size_t byteCount = sizeof(float) * frameCount;
+    const size_t byteCount = sizeof(decltype(m_audio)::value_type) * frameCount;
     memset(output, '\0', byteCount); // could Optimize™ and only zero the frames at the end, but idc
     if (frameCount > m_audio.size()) {
         frameCount = m_audio.size();
