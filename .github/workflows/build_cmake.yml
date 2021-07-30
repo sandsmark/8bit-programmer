@@ -80,5 +80,5 @@ jobs:
       with:
         artifacts: "8bit-programmer-*.zip"
         token: ${{ secrets.GITHUB_TOKEN }}
-        tag: 64
+        tag: 30-07-2021
         allowUpdates: true
