@@ -25,6 +25,7 @@
 #include <QSpinBox>
 #include <QSlider>
 #include <QWindow>
+#include <QProgressBar>
 
 #include <QtMath>
 
@@ -66,14 +67,23 @@ void Editor::onDevicesUpdated(const QStringList &devices)
     }
 }
 
-void Editor::maybeUpdateDevices()
+void Editor::updateDevices()
 {
-    if (!windowHandle()->isExposed()) {
-        return;
-    }
-    if (!isSerialPort(m_outputSelect->currentText())) {
+    if (m_modem->audioAvailable()) {
         m_modem->updateAudioDevices();
         return;
+    }
+
+    const QString selectedDevice = m_outputSelect->currentText();
+    m_outputSelect->clear();
+
+    for (const QSerialPortInfo &portInfo : QSerialPortInfo::availablePorts()) {
+        m_outputSelect->addItem(portInfo.portName());
+    }
+
+    int newIndex = m_outputSelect->findText(selectedDevice);
+    if (newIndex != -1) {
+        m_outputSelect->setCurrentIndex(newIndex);
     }
     // TODO: update serial ports
 }
@@ -161,7 +171,6 @@ Editor::Editor(QWidget *parent)
     settingsButton->setCheckable(true);
 
     for (const QSerialPortInfo &portInfo : QSerialPortInfo::availablePorts()) {
-        qDebug() << "Port:" << portInfo.portName();
         m_outputSelect->addItem(portInfo.portName());
     }
 
@@ -203,24 +212,24 @@ Editor::Editor(QWidget *parent)
     m_settingsLayout->addWidget(m_markFreq);
     m_settingsLayout->addStretch();
 
-    QSlider *volumeSlider = new QSlider;
-    volumeSlider->setMinimum(1);
-    volumeSlider->setMaximum(100);
-    volumeSlider->setOrientation(Qt::Horizontal);
-    volumeSlider->setMinimumWidth(100);
+    m_volumeSlider = new QSlider;
+    m_volumeSlider->setMinimum(1);
+    m_volumeSlider->setMaximum(100);
+    m_volumeSlider->setOrientation(Qt::Horizontal);
+    m_volumeSlider->setMinimumWidth(100);
     m_settingsLayout->addWidget(new QLabel(tr("Volume:")));
-    m_settingsLayout->addWidget(volumeSlider);
+    m_settingsLayout->addWidget(m_volumeSlider);
     m_settingsLayout->addStretch();
 
-    QComboBox *waveformSelect = new QComboBox;
-    waveformSelect->addItems({
+    m_waveformSelect = new QComboBox;
+    m_waveformSelect->addItems({
         tr("Square"),
         tr("Sawtooth"),
         tr("Triangle"),
         tr("Sine"),
         });
     m_settingsLayout->addWidget(new QLabel("Waveform:"));
-    m_settingsLayout->addWidget(waveformSelect);
+    m_settingsLayout->addWidget(m_waveformSelect);
     m_settingsLayout->addStretch();
 
     m_baudSelect = new BaudEdit();
@@ -239,12 +248,17 @@ Editor::Editor(QWidget *parent)
     m_settingsLayout->addWidget(new QLabel(tr("Baud:")));
     m_settingsLayout->addWidget(m_baudSelect);
 
+    m_progressBar = new QProgressBar;
+    m_progressBar->setMaximum(100);
+    m_progressBar->setVisible(false);
+
     QHBoxLayout *uploadBottomLayout = new QHBoxLayout;
 
     mainLayout->addLayout(topLayout);
     mainLayout->addLayout(editorLayout, 2);
     mainLayout->addLayout(m_settingsLayout);
     mainLayout->addLayout(uploadLayout);
+    mainLayout->addWidget(m_progressBar);
     mainLayout->addLayout(uploadBottomLayout);
 
     m_memContents = new QPlainTextEdit;
@@ -294,7 +308,7 @@ Editor::Editor(QWidget *parent)
     m_modem->setFrequencies(spaceFreq, markFreq);
 
     m_modem->setWaveform(settings.value(s_settingsKeyWaveform, AudioBuffer::Sine).toInt());
-    waveformSelect->setCurrentIndex(m_modem->currentWaveform());
+    m_waveformSelect->setCurrentIndex(m_modem->currentWaveform());
 
     QTimer *timer = new QTimer(this);
     timer->setSingleShot(true);
@@ -319,14 +333,15 @@ Editor::Editor(QWidget *parent)
     connect(m_baudSelect, &QComboBox::textActivated, this, &Editor::onBaudChanged); // meh, use currenttext because the other is overloaded
     connect(m_spaceFreq, &QSpinBox::textChanged, this, &Editor::onFrequencyChanged); // valueChanged is fucked because wtf qt
     connect(m_markFreq, &QSpinBox::textChanged, this, &Editor::onFrequencyChanged); // valueChanged is fucked because wtf qt
-    connect(volumeSlider, &QSlider::valueChanged, this, &Editor::setVolume);
+    connect(m_volumeSlider, &QSlider::valueChanged, this, &Editor::setVolume);
     connect(m_refreshButton, &QPushButton::clicked, m_modem, &Modem::updateAudioDevices);
-    connect(m_modem, &Modem::devicesUpdated, this, &Editor::onDevicesUpdated);
-    connect(m_modem, &Modem::finished, this, &Editor::onUploadFinished);
+    connect(m_modem, &Modem::devicesUpdated, this, &Editor::onDevicesUpdated, Qt::QueuedConnection);
+    connect(m_modem, &Modem::stopped, this, &Editor::onUploadFinished, Qt::QueuedConnection);
+    connect(m_modem, &Modem::progress, m_progressBar, &QProgressBar::setValue);
     connect(m_outputSelect, &QComboBox::textActivated, this, &Editor::onOutputChanged);
-    connect(waveformSelect, qOverload<int>(&QComboBox::currentIndexChanged), this, &Editor::onWaveformSelected);
+    connect(m_waveformSelect, qOverload<int>(&QComboBox::currentIndexChanged), this, &Editor::onWaveformSelected);
 
-    volumeSlider->setValue(settings.value(s_settingsKeyVolume, 75).toInt());
+    m_volumeSlider->setValue(settings.value(s_settingsKeyVolume, 75).toInt());
 
     setSettingsVisible(false);
 
@@ -405,6 +420,7 @@ void Editor::onAsmChanged()
 
 void Editor::onUploadFinished()
 {
+    qDebug() << "Upload finished";
     for (int i=0; i<m_settingsLayout->count(); i++) {
         QWidget *widget = m_settingsLayout->itemAt(i)->widget();
         if (!widget) {
@@ -413,23 +429,34 @@ void Editor::onUploadFinished()
         widget->setEnabled(true);
     }
 
+    m_progressBar->setVisible(false);
+    m_progressBar->setValue(0);
+    qDebug() << "Hidden progress bar";
     m_uploadButton->setChecked(false);
     m_outputSelect->setEnabled(true);
     m_refreshButton->setEnabled(true);
-    m_updateTimer->start();
 }
 
 void Editor::onUploadClicked()
 {
     // TODO: more configurable, show output received back/get feedback, async so the user can cancel
 
+    QSettings settings;
+
     const QByteArray data = m_memContents->toPlainText().toLatin1();
 
+    qDebug() << "Upload clicked";
     if (!isSerialPort(m_outputSelect->currentText())) {
         if (!m_uploadButton->isChecked()) {
             m_modem->stop();
             return;
         }
+        if (!m_modem->audioOutputDevices().contains(m_outputSelect->currentText())) {
+            qWarning() << "Can't upload to invalid device";
+            return;
+        }
+
+        settings.setValue(s_settingsKeyLastOutput, m_outputSelect->currentText());
         for (int i=0; i<m_settingsLayout->count(); i++) {
             QWidget *widget = m_settingsLayout->itemAt(i)->widget();
             if (!widget) {
@@ -440,9 +467,15 @@ void Editor::onUploadClicked()
 
         m_outputSelect->setEnabled(false);
         m_refreshButton->setEnabled(false);
-        m_updateTimer->stop();
+        m_progressBar->setVisible(true);
+
+        m_modem->setBaud(m_baudSelect->currentText().toInt());
+        m_modem->setWaveform(AudioBuffer::Waveform(m_waveformSelect->currentIndex()));
+        m_modem->setVolume(m_volumeSlider->value() / 100.f);
+        m_modem->setFrequencies(m_spaceFreq->value(), m_markFreq->value());
 
         emit sendData(data);
+
         return;
     }
 
@@ -453,6 +486,8 @@ void Editor::onUploadClicked()
         QMessageBox::warning(this, "Failed top open serial port", serialPort.errorString());
         return;
     }
+
+    settings.setValue(s_settingsKeyLastOutput, m_outputSelect->currentText());
 
 
     serialPort.write("\n");
@@ -624,7 +659,7 @@ void Editor::setSettingsVisible(bool visible)
 
 void Editor::onOutputChanged(const QString &outputName)
 {
-    qDebug() << outputName;
+    qDebug() << "Output set to" << outputName;
     QSettings settings;
     settings.setValue(s_settingsKeyLastOutput, outputName);
 

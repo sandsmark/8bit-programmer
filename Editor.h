@@ -56,6 +56,7 @@ class QComboBox;
 class QHBoxLayout;
 class QSpinBox;
 class QPushButton;
+class QProgressBar;
 class Modem;
 
 class Editor : public QWidget
@@ -97,7 +98,7 @@ private slots:
     void onNewFileClicked();
     void setVolume(const int percent);
     void onWaveformSelected(int waveform);
-    void maybeUpdateDevices();
+    void updateDevices();
 
 private:
     static bool isSerialPort(const QString &name);
@@ -129,6 +130,8 @@ private:
     QPlainTextEdit *m_serialOutput = nullptr;
     QPushButton *m_refreshButton = nullptr;
 
+    QProgressBar *m_progressBar = nullptr;
+
     QHash<QString, uint32_t> m_labels;
     QVector<int> m_outputLineNumbers;
 
@@ -137,13 +140,12 @@ private:
     Type m_type = Type::BenEater;
 
     QComboBox *m_baudSelect;
+    QComboBox *m_waveformSelect;
+    QSlider *m_volumeSlider;
     QHBoxLayout *m_settingsLayout;
 
     QSpinBox *m_spaceFreq;
     QSpinBox *m_markFreq;
 
     Modem *m_modem;
-
-    // Kind of a hack, but miniaudio doesn't have any callbacks for updating
-    QTimer *m_updateTimer;
 };
