@@ -226,7 +226,7 @@ Editor::Editor(QWidget *parent)
     m_baudSelect = new BaudEdit();
 
     m_baudSelect->setEditable(true);
-    m_baudSelect->setValidator(new QIntValidator(1, 256000));
+    m_baudSelect->setValidator(new QIntValidator(1, 256000, this));
     m_baudSelect->addItems({
         "110",
         "300",
