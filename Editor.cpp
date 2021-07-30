@@ -744,6 +744,12 @@ void Editor::highlightOutput(const int firstLine, const int lastLine)
             break;
         }
     }
+
+    if (lastLine == -1) {
+        m_binOutput->moveCursor(QTextCursor::End, QTextCursor::KeepAnchor);
+        // Skip the last newline at the end
+        m_binOutput->moveCursor(QTextCursor::Left, QTextCursor::KeepAnchor);
+    }
 }
 
 bool Editor::save()
