@@ -77,6 +77,9 @@ jobs:
         dir /s MSVCP140.dll
         dir /s api-ms-win-crt-runtime-l1-1-0.dll
         dir /s nsi.dll
+        cd /d "%Qt5_Dir%"
+        dir /s "*.dll"
+
 
     - uses: ncipollo/release-action@v1
       with:
