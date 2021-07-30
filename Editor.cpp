@@ -375,10 +375,11 @@ void Editor::onTypeChanged()
 void Editor::onAsmChanged()
 {
     m_labels.clear();
+    m_usedLabels.clear();
     int num = 0;
     // TODO: better way to resolve names
     for (const QString &line : m_asmEdit->toPlainText().split('\n')) {
-        parseToBinary(line, &num);
+        parseToBinary(line, &num, true);
     }
 
     m_binOutput->clear();
@@ -388,7 +389,7 @@ void Editor::onAsmChanged()
     int outputLineNum = 0;
 //    m_outputLineNumbers.append(0);
     for (const QString &line : m_asmEdit->toPlainText().split('\n')) {
-        const QString output = parseToBinary(line, &num);
+        const QString output = parseToBinary(line, &num, false);
 
         // TODO: no point in trying to sync up empty lines when there isn't 1-1 mapping between lines
         if (output.isEmpty()) {
@@ -398,7 +399,6 @@ void Editor::onAsmChanged()
 
         m_outputLineNumbers.append(outputLineNum);
         outputLineNum += output.count('\n') + 1;
-
         m_binOutput->insertPlainText(output + "\n");
     }
 
@@ -802,7 +802,7 @@ QString Editor::generateTempFilename()
     ((byte) & 0x02 ? '1' : '0'), \
     ((byte) & 0x01 ? '1' : '0')
 
-QString Editor::parseToBinary(const QString &line, int *num)
+QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
 {
     const int eol = line.indexOf(';');
     QStringList tokens = line.mid(0, eol).split(' ', Qt::SkipEmptyParts);
@@ -812,8 +812,15 @@ QString Editor::parseToBinary(const QString &line, int *num)
     QString op = tokens.first().toLower().simplified();
     if (op.endsWith(":")) {
         op.chop(1);
+        if (!firstPass) {
+            if (m_usedLabels.contains(op)) {
+                return " ; WARNING: label '" + op + "' already exists\n";
+            }
+            m_usedLabels.insert(op);
+        }
+
         m_labels[op] = *num;
-        return " ; Label '" + op + "'";
+        return " ; Label '" + op + "'\n";
     }
 
     uint16_t binary = 0;

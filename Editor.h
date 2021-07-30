@@ -110,7 +110,7 @@ private:
 
     static QString generateTempFilename();
 
-    QString parseToBinary(const QString &line, int *num);
+    QString parseToBinary(const QString &line, int *num, bool firstPass);
     struct Operator {
         uint8_t opcode;
         int numArguments = 0; // todo use
@@ -133,6 +133,7 @@ private:
     QProgressBar *m_progressBar = nullptr;
 
     QHash<QString, uint32_t> m_labels;
+    QSet<QString> m_usedLabels; // so sue me
     QVector<int> m_outputLineNumbers;
 
     QString m_currentFile;
