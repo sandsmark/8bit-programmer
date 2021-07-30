@@ -58,7 +58,7 @@ jobs:
       run: |
         @echo on
         mkdir 8bit-programmer
-        move Release\8bit-programmer.exe 8bit-programmer\
+        move 8bit-programmer.exe 8bit-programmer\
         cd 8bit-programmer
         windeployqt --no-translations 8bit-programmer.exe
         cd ..
