@@ -67,6 +67,10 @@ jobs:
         copy "%Qt5_Dir%\bin\libwinpthread-1.dll" 8bit-programmer
         copy "%Qt5_Dir%\bin\libgcc_s_seh-1.dll" 8bit-programmer
         7z a 8bit-programmer-v%GITHUB_RUN_NUMBER%.zip 8bit-programmer\*
+        cd "%Qt5_Dir%"
+        dir /s iphlpapi.dll
+        dir /s NETAPI32.dll
+        dir /s nsi.dll
 
 
     - uses: ncipollo/release-action@v1
