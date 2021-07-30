@@ -829,7 +829,7 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
     QString helpText;
     if (op == ".db") {
         if (tokens.count() < 3) {
-            return "; Syntax: .db address value [label]";
+            return "; Syntax: .db address value [label]\n";
         }
         bool ok = false;
         const QString addressString = tokens.takeAt(1);
@@ -840,10 +840,10 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
             address = (addressString.toInt(&ok));
         }
         if (!ok) {
-            return "; Invalid value '" + addressString + "'";
+            return "; Invalid value '" + addressString + "'\n";
         }
         if (address > 0xFF) {
-            return "; Address out of range: " + QString::number(address);
+            return "; Address out of range: " + QString::number(address) + "\n";
         }
         helpText = QString("Memory content at %1 is %2");
         if (tokens.count() > 2) {
@@ -852,10 +852,10 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
         }
     } else {
         if (!m_ops.contains(op)) {
-            return "; Invalid operator '" + op + "'";
+            return "; Invalid operator '" + op + "'\n";
         }
         if (tokens.count() != m_ops[op].numArguments + 1) {
-            return "; Operator '" + op + "' takes " + QString::number(m_ops[op].numArguments) + " argument(s)";
+            return "; Operator '" + op + "' takes " + QString::number(m_ops[op].numArguments) + " argument(s)\n";
         }
         if (m_type == Type::BenEater) {
             binary = m_ops[op].opcode << 4;
@@ -881,11 +881,11 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
         }
 
         if (!ok) {
-            return "; Invalid value '" + tokens[1] + "'";
+            return "; Invalid value '" + tokens[1] + "'\n";
         }
 
         if (value > 0xF && (m_type == Type::BenEater && op != ".db")) {
-            return "; Value out of range: " + QString::number(value);
+            return "; Value out of range: " + QString::number(value) + "\n";
         }
 
         if (op == ".db") {
@@ -906,7 +906,7 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
     }
 
     QString ret;
-    if (m_type == Type::ExtendedMemory) {
+    if (m_type == Type::ExtendedMemory && op != ".db") {
         ret = "; " + line.mid(0, eol).simplified() + ": " + helpText + "\n";
         helpText.clear();
     }
@@ -923,7 +923,7 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
             // TODO: track line numbers
             const QString otherValue = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(m_memory[address]));
             const QString otherAddressBin = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(address));
-            helpText +=  " WARNING: overwrites another value (" + otherValue + ")!";
+            helpText +=  " WARNING: overwrites " + otherValue + " at " + otherAddressBin + "!";
         }
         m_memory[address] = binary & 0xFF;
 
@@ -933,7 +933,12 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
             ret += "\t; " + helpText;
         }
 
-        if (m_type == Type::BenEater || op == ".db") {
+        if (op == ".db") {
+            ret += "\n";
+            break;
+        }
+
+        if (m_type == Type::BenEater) {
             break;
         }
 
