@@ -43,6 +43,13 @@ set(PROJECT_SOURCES
         MiniAudio_impl.cpp
 )
 
+option(ENABLE_SANITIZERS "Enable runtime sanitizing (for development)")
+if (ENABLE_SANITIZERS)
+    message("Enabling asan and ubsan")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined")
+endif()
+
 if(MSVC)
     add_definitions(/D_USE_MATH_DEFINES)
 endif()
