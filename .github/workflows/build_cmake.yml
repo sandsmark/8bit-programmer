@@ -60,7 +60,7 @@ jobs:
         mkdir 8bit-programmer
         move Release\8bit-programmer.exe 8bit-programmer\
         cd 8bit-programmer
-        windeployqt 8bit-programmer.exe
+        windeployqt --no-translations 8bit-programmer.exe
         cd ..
         7z a 8bit-programmer-v%GITHUB_RUN_NUMBER%.zip 8bit-programmer\*
 
