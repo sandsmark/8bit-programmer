@@ -65,6 +65,8 @@ jobs:
         move Release\8bit-programmer.exe 8bit-programmer\
         copy "%VCToolsRedistDir%\x64\Microsoft.VC142.CRT\vcruntime140.dll" 8bit-programmer
         copy "%VCToolsRedistDir%\x64\Microsoft.VC142.CRT\vcruntime140.dll" 8bit-programmer
+        copy "%VCToolsRedistDir%\x64\Microsoft.VC142.CRT\MSVCP140.dll" 8bit-programmer
+        copy "%VCToolsRedistDir%\x64\Microsoft.VC142.CRT\MSVCP140_1.dll" 8bit-programmer
         copy "%Qt5_Dir%\bin\Qt5Core.dll" 8bit-programmer
         copy "%Qt5_Dir%\bin\Qt5Gui.dll" 8bit-programmer
         copy "%Qt5_Dir%\bin\Qt5Widgets.dll" 8bit-programmer
