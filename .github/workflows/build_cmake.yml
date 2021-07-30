@@ -63,15 +63,15 @@ jobs:
         @echo on
         mkdir 8bit-programmer
         move Release\8bit-programmer.exe 8bit-programmer\
-        echo "%VCINSTALLDIR%\redist\msvc\14.28.29910\x64\Microsoft.VC142.CRT\msvcp140.dll"
-        copy "%VCINSTALLDIR%\redist\msvc\14.28.29910\x64\Microsoft.VC142.CRT\vcruntime140.dll" 8bit-programmer
-        copy "%VCINSTALLDIR%\redist\msvc\14.28.29910\x64\Microsoft.VC142.CRT\vcruntime140.dll" 8bit-programmer
+        copy "%VCToolsRedistDir%\x64\Microsoft.VC142.CRT\vcruntime140.dll" 8bit-programmer
+        copy "%VCToolsRedistDir%\x64\Microsoft.VC142.CRT\vcruntime140.dll" 8bit-programmer
         copy "%Qt5_Dir%\bin\Qt5Core.dll" 8bit-programmer
         copy "%Qt5_Dir%\bin\Qt5Gui.dll" 8bit-programmer
         copy "%Qt5_Dir%\bin\Qt5Widgets.dll" 8bit-programmer
         copy "%Qt5_Dir%\bin\Qt5SerialPort.dll" 8bit-programmer
         mkdir 8bit-programmer\platforms
         copy "%Qt5_Dir%\plugins\platforms\qwindows.dll" 8bit-programmer\platforms
+        copy "README.md" 8bit-programmer
         7z a 8bit-programmer-%GITHUB_RUN_NUMBER%.zip 8bit-programmer\*
 
     - uses: ncipollo/release-action@v1
