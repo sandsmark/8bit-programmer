@@ -134,8 +134,14 @@ void SyntaxHighlighter::highlightBlock(const QString &text)
     dbFormat.setForeground(Qt::darkBlue);
 
     QTextCharFormat varNameFormat = varFormat;
-
     varNameFormat.setFontWeight(QFont::Bold);
+
+    QTextCharFormat labelFormat;
+    labelFormat.setFontWeight(QFont::Bold);
+
+    QTextCharFormat warningFormat;
+    warningFormat.setForeground(Qt::darkRed);
+    warningFormat.setFontWeight(QFont::Bold);
 
     QRegularExpression expression(";.*$");
     QRegularExpressionMatchIterator i = expression.globalMatch(text);
@@ -192,5 +198,18 @@ void SyntaxHighlighter::highlightBlock(const QString &text)
             setFormat(match.capturedStart(3), match.capturedLength(3), binFormat2);
         }
 
+    }
+    expression = QRegularExpression(";.*(WARNING).*");
+    i = expression.globalMatch(text);
+    while (i.hasNext()) {
+        QRegularExpressionMatch match = i.next();
+        setFormat(match.capturedStart(1), match.capturedLength(1), warningFormat);
+    }
+
+    expression = QRegularExpression("^\\s*([a-zA-Z][a-zA-Z0-9]*:)\\s*(;.*)?$");
+    i = expression.globalMatch(text);
+    while (i.hasNext()) {
+        QRegularExpressionMatch match = i.next();
+        setFormat(match.capturedStart(1), match.capturedLength(1), labelFormat);
     }
 }
