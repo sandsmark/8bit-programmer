@@ -73,7 +73,7 @@ jobs:
         copy "%Qt5_Dir%\plugins\platforms\qwindows.dll" 8bit-programmer\platforms
         copy "README.md" 8bit-programmer
         7z a 8bit-programmer-v%GITHUB_RUN_NUMBER%.zip 8bit-programmer\*
-        cd "%VCINSTALLDIR%"
+        cd %VCINSTALLDIR%
         dir /s MSVCP140.dll
         dir /s api-ms-win-crt-runtime-l1-1-0.dll
         dir /s nsi.dll
