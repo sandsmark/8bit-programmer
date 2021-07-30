@@ -75,7 +75,3 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         tag: 64
         allowUpdates: true
-
-    - name: Why the fuck not
-      shell: cmd
-      run: vcpkg install qt5:x86-windows-static
