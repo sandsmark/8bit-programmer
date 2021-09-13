@@ -93,22 +93,27 @@ void Editor::updateDevices()
 Editor::Editor(QWidget *parent)
     : QWidget(parent),
     m_ops {
-        {"nop", { 0b0000, 0, "Do nothing" }},
-        {"lda", { 0b0001, 1, "Load contents of memory address %1 into register A" }},
-        {"add", { 0b0010, 1, "Add memory content at %1 to content of register A" }},
-        {"sub", { 0b0011, 1, "Subtract memory content at %1 from content of register A" }},
-        {"sta", { 0b0100, 0, "Store contents of a" }},
-        {"ldi", { 0b0101, 1, "Store %1 to instruction register" }},
-        {"jmp", { 0b0110, 1, "Jump to %1" }},
-        {"jc",  { 0b0111, 1, "Jump to %1 if result of last calculation overflowed" }},
-        {"jz",  { 0b1000, 1, "Jump to %1 if result of last calculation was zero" }},
+        {"nop",  { 0b00000, 0, "Do nothing", Type::Original }},
+        {"lda",  { 0b00001, 1, "Load contents of memory address %1 into register A", Type::Original }},
+        {"add",  { 0b00010, 1, "Add memory content at %1 to content of register A", Type::Original }},
+        {"sub",  { 0b00011, 1, "Subtract memory content at %1 from content of register A", Type::Original }},
+        {"sta",  { 0b00100, 0, "Store contents of a", Type::Original }},
+        {"ldi",  { 0b00101, 1, "Store %1 to instruction register", Type::Original }},
+        {"jmp",  { 0b00110, 1, "Jump to %1", Type::Original }},
+        {"jc",   { 0b00111, 1, "Jump to %1 if result of last calculation overflowed", Type::Original }},
+        {"jz",   { 0b01000, 1, "Jump to %1 if result of last calculation was zero", Type::Original }},
 
         // TODO: these are only valid for the extended, but we don't check
-        {"addi", { 0b0010, 1, "Add value %1 to content of register A (Extended only)" }},
-        {"subi", { 0b0010, 1, "Subtract value %1 from content of register A (Extended only)" }},
+        {"addi", { 0b01001, 1, "Add value %1 to content of register A (Extended only)", Type::Extended }},
+        {"subi", { 0b01010, 1, "Subtract value %1 from content of register A (Extended only)", Type::Extended }},
 
-        {"out", { 0b1110, 0, "Show content of register A on display" }},
-        {"hlt", { 0b1111, 0, "Halt execution" }},
+        {"out",  { 0b01110, 0, "Show content of register A on display", Type::Original }},
+        {"hlt",  { 0b01111, 0, "Halt execution", Type::Original }},
+
+        {"psh",  { 0b10000, 0, "Push content of register A onto stack", Type::Extended }},
+        {"pop",  { 0b10000, 0, "Pop top of stack into register A", Type::Extended }},
+        {"jsr",  { 0b10000, 1, "Jump to subroutine", Type::Extended }},
+        {"rts",  { 0b10000, 1, "Return from subroutine", Type::Extended }},
     }
 {
     // TODO: make user definable, need another tab
@@ -276,11 +281,11 @@ Editor::Editor(QWidget *parent)
 
     const QString lastType = settings.value(s_settingsKeyType).toString();
     if (lastType == s_settingsValExt) {
-        m_type = Type::ExtendedMemory;
+        m_type = Type::Extended;
         m_typeDropdown->setCurrentIndex(1);
         m_asmEdit->setBytesPerLine(2);
     } else {
-        m_type = Type::BenEater;
+        m_type = Type::Original;
         m_asmEdit->setBytesPerLine(1);
     }
 
@@ -345,11 +350,75 @@ Editor::Editor(QWidget *parent)
     setSettingsVisible(false);
 
     restoreGeometry(settings.value("geometry").toByteArray());
+
+    //loadOperators(":/operators.txt");
 }
 
 Editor::~Editor()
 {
     save();
+}
+
+QHash<QString, Editor::Operator> Editor::loadOperators(const QString &filename)
+{
+    QFile file(filename);
+    if (!file.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(this, "Failed top open operators file", file.errorString());
+        return {};
+    }
+    QHash<QString, Operator> operators;
+    while (!file.atEnd()) {
+        const QString &line = QString::fromUtf8(file.readLine()).simplified();
+        if (line.startsWith('#')) {
+            continue;
+        }
+        if (line.isEmpty()) {
+            continue;
+        }
+        const QStringList parts = line.split(';');
+        if (parts.count() != 4) {
+            QMessageBox::warning(this, "Invalid operators file", "Invalid line: " + line);
+            return {};
+        }
+        const QString name = parts[0].trimmed();
+        if (name.isEmpty()) {
+            QMessageBox::warning(this, "Invalid operators file", "Missing operator name: " + line);
+            return {};
+        }
+        Operator op;
+        QString opcode = parts[1].trimmed();
+
+        bool ok;
+        if (opcode.startsWith("0b")) {
+            opcode = opcode.mid(2);
+            op.opcode = opcode.toInt(&ok, 2);
+        } else {
+            op.opcode = opcode.toInt(&ok, 0);
+        }
+        if (!ok) {
+            QMessageBox::warning(this, "Invalid operators file", "Invalid opcode on line: " + line);
+            return {};
+        }
+        op.numArguments = parts[2].trimmed().toInt(&ok);
+        if (!ok || op.numArguments < 0) {
+            QMessageBox::warning(this, "Invalid operators file", "Invalid number of operators on line: " + line);
+            return {};
+        }
+        if (op.numArguments > 1) {
+            QMessageBox::warning(this, "Invalid operators file", "Only supports 0 or 1 operators for now: " + line);
+            return {};
+        }
+        op.help = parts[3].trimmed();
+        if (op.numArguments == 0 && op.help.contains("%1")) {
+            QMessageBox::warning(this, "Invalid operators file", "Description can't contain %1 for ops without arguments: " + line);
+            return {};
+        }
+
+        operators[name] = op;
+        qDebug() << name << op.help;
+    }
+
+    return operators;
 }
 
 void Editor::closeEvent(QCloseEvent *event)
@@ -364,13 +433,13 @@ void Editor::onTypeChanged()
     QSettings settings;
     switch(m_typeDropdown->currentIndex()) {
     case 0:
-        m_type = Type::BenEater;
+        m_type = Type::Original;
         settings.setValue(s_settingsKeyType, s_settingsValOrig);
         m_asmEdit->setBytesPerLine(1);
         break;
     case 1:
         settings.setValue(s_settingsKeyType, s_settingsValExt);
-        m_type = Type::ExtendedMemory;
+        m_type = Type::Extended;
         m_asmEdit->setBytesPerLine(2);
         break;
     }
@@ -862,7 +931,7 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
         if (tokens.count() != m_ops[op].numArguments + 1) {
             return "; Operator '" + op + "' takes " + QString::number(m_ops[op].numArguments) + " argument(s)\n";
         }
-        if (m_type == Type::BenEater) {
+        if (m_type == Type::Original) {
             binary = m_ops[op].opcode << 4;
             (*num)++;
         } else {
@@ -889,7 +958,7 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
             return "; Invalid value '" + tokens[1] + "'\n";
         }
 
-        if (value > 0xF && (m_type == Type::BenEater && op != ".db")) {
+        if (value > 0xF && (m_type == Type::Original && op != ".db")) {
             return "; Value out of range: " + QString::number(value) + "\n";
         }
 
@@ -899,7 +968,7 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
             helpText = helpText.arg(value);
         }
 
-        if (m_type == Type::BenEater) {
+        if (m_type == Type::Original) {
             binary |= value & 0xF;
         } else {
             if (op == ".db") {
@@ -911,14 +980,14 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
     }
 
     QString ret;
-    if (m_type == Type::ExtendedMemory && op != ".db") {
+    if (m_type == Type::Extended && op != ".db") {
         ret = "; " + line.mid(0, eol).simplified() + ": " + helpText + "\n";
         helpText.clear();
     }
     for (int i=0; i<2; i++) {
         const QByteArray binaryString = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(binary & 0xFF)).toLatin1();
         QByteArray addressString;
-        if (m_type == Type::BenEater) {
+        if (m_type == Type::Original) {
             addressString = QString::asprintf(NIBBLE_TO_BINARY_PATTERN, NIBBLE_TO_BINARY(address)).toLatin1();
         } else {
             addressString = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(address)).toLatin1();
@@ -943,7 +1012,7 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
             break;
         }
 
-        if (m_type == Type::BenEater) {
+        if (m_type == Type::Original) {
             break;
         }
 

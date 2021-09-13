@@ -64,8 +64,15 @@ class Editor : public QWidget
     Q_OBJECT
 
     enum class Type {
-        BenEater,
-        ExtendedMemory
+        Original,
+        Extended
+    };
+
+    struct Operator {
+        uint8_t opcode;
+        int numArguments = 0; // todo use
+        QString help;
+        Type type;
     };
 
 public:
@@ -103,6 +110,7 @@ private slots:
 private:
     static bool isSerialPort(const QString &name);
     bool loadFile(const QString &path);
+    QHash<QString, Operator> loadOperators(const QString &file);
 
     int currentLineNumber();
     void scrollOutputTo(const int line);
@@ -111,11 +119,6 @@ private:
     static QString generateTempFilename();
 
     QString parseToBinary(const QString &line, int *num, bool firstPass);
-    struct Operator {
-        uint8_t opcode;
-        int numArguments = 0; // todo use
-        QString help;
-    };
 
     CodeTextEdit *m_asmEdit = nullptr;
     QPlainTextEdit *m_binOutput = nullptr;
@@ -138,7 +141,7 @@ private:
 
     QString m_currentFile;
 
-    Type m_type = Type::BenEater;
+    Type m_type = Type::Original;
 
     QComboBox *m_baudSelect;
     QComboBox *m_waveformSelect;
