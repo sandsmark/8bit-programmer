@@ -75,6 +75,11 @@ class Editor : public QWidget
         Type type;
     };
 
+    struct CPU {
+        uint8_t bits = 8;
+        QHash<QString, Operator> operators;
+    };
+
 public:
     Editor(QWidget *parent = nullptr);
     ~Editor();
@@ -110,7 +115,7 @@ private slots:
 private:
     static bool isSerialPort(const QString &name);
     bool loadFile(const QString &path);
-    QHash<QString, Operator> loadOperators(const QString &file);
+    CPU loadCPU(const QString &file);
 
     int currentLineNumber();
     void scrollOutputTo(const int line);

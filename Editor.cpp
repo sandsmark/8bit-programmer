@@ -359,14 +359,15 @@ Editor::~Editor()
     save();
 }
 
-QHash<QString, Editor::Operator> Editor::loadOperators(const QString &filename)
+Editor::CPU Editor::loadCPU(const QString &filename)
 {
     QFile file(filename);
     if (!file.open(QIODevice::ReadOnly)) {
         QMessageBox::warning(this, "Failed top open operators file", file.errorString());
         return {};
     }
-    QHash<QString, Operator> operators;
+    CPU cpu;
+    QSet<uint8_t> usedOpcodes;
     while (!file.atEnd()) {
         const QString &line = QString::fromUtf8(file.readLine()).simplified();
         if (line.startsWith('#')) {
@@ -375,50 +376,76 @@ QHash<QString, Editor::Operator> Editor::loadOperators(const QString &filename)
         if (line.isEmpty()) {
             continue;
         }
+        bool ok;
+        if (line.startsWith("bits:")) {
+            int bits = line.split(':').last().toInt(&ok);
+            if (!ok) {
+                QMessageBox::warning(this, "Invalid operators file", "Invalid bits specification:\n" + line);
+                return {};
+            }
+            if (bits != 8 && bits != 16) {
+                QMessageBox::warning(this, "Invalid operators file", "Only 8 and 16 bit opcodes are supported:\n" + line);
+                return {};
+            }
+            cpu.bits = bits;
+            qDebug() << "Bits:" << cpu.bits;
+            continue;
+        }
         const QStringList parts = line.split(';');
         if (parts.count() != 4) {
-            QMessageBox::warning(this, "Invalid operators file", "Invalid line: " + line);
+            QMessageBox::warning(this, "Invalid operators file", "Invalid line:\n" + line);
             return {};
         }
         const QString name = parts[0].trimmed();
         if (name.isEmpty()) {
-            QMessageBox::warning(this, "Invalid operators file", "Missing operator name: " + line);
+            QMessageBox::warning(this, "Invalid operators file", "Missing operator name:\n" + line);
+            return {};
+        }
+        if (cpu.operators.contains(name)) {
+            QMessageBox::warning(this, "Invalid operators file", "Duplicate operator:\n" + line);
             return {};
         }
         Operator op;
         QString opcode = parts[1].trimmed();
 
-        bool ok;
         if (opcode.startsWith("0b")) {
+            qDebug() << opcode;
             opcode = opcode.mid(2);
+            qDebug() << opcode;
             op.opcode = opcode.toInt(&ok, 2);
         } else {
             op.opcode = opcode.toInt(&ok, 0);
         }
         if (!ok) {
-            QMessageBox::warning(this, "Invalid operators file", "Invalid opcode on line: " + line);
+            QMessageBox::warning(this, "Invalid operators file", "Invalid opcode on line:\n" + line);
             return {};
         }
+        if (usedOpcodes.contains(op.opcode)) {
+            QMessageBox::warning(this, "Invalid operators file", "Duplicate opcode on line:\n" + line);
+            return {};
+        }
+        usedOpcodes.insert(op.opcode);
+
         op.numArguments = parts[2].trimmed().toInt(&ok);
         if (!ok || op.numArguments < 0) {
-            QMessageBox::warning(this, "Invalid operators file", "Invalid number of operators on line: " + line);
+            QMessageBox::warning(this, "Invalid operators file", "Invalid number of operators on line:\n" + line);
             return {};
         }
         if (op.numArguments > 1) {
-            QMessageBox::warning(this, "Invalid operators file", "Only supports 0 or 1 operators for now: " + line);
+            QMessageBox::warning(this, "Invalid operators file", "Only supports 0 or 1 operators for now:\n" + line);
             return {};
         }
         op.help = parts[3].trimmed();
         if (op.numArguments == 0 && op.help.contains("%1")) {
-            QMessageBox::warning(this, "Invalid operators file", "Description can't contain %1 for ops without arguments: " + line);
+            QMessageBox::warning(this, "Invalid operators file", "Description can't contain %1 for ops without arguments:\n" + line);
             return {};
         }
 
-        operators[name] = op;
-        qDebug() << name << op.help;
+        cpu.operators[name] = op;
+        qDebug() << name << op.opcode << op.help;
     }
 
-    return operators;
+    return cpu;
 }
 
 void Editor::closeEvent(QCloseEvent *event)
