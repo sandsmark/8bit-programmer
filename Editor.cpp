@@ -409,12 +409,12 @@ Editor::CPU Editor::loadCPU(const QString &filename)
         QString opcode = parts[1].trimmed();
 
         if (opcode.startsWith("0b")) {
-            qDebug() << opcode;
             opcode = opcode.mid(2);
-            qDebug() << opcode;
             op.opcode = opcode.toInt(&ok, 2);
-        } else {
+        } else if (opcode.startsWith("0x")) {
             op.opcode = opcode.toInt(&ok, 0);
+        } else {
+            op.opcode = opcode.toInt(&ok);
         }
         if (!ok) {
             QMessageBox::warning(this, "Invalid operators file", "Invalid opcode on line:\n" + line);
