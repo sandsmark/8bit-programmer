@@ -8,7 +8,7 @@ class SyntaxHighlighter : public QSyntaxHighlighter
 {
     Q_OBJECT
 public:
-    SyntaxHighlighter(QTextDocument *document, const QStringList &ops) : QSyntaxHighlighter(document), m_ops(ops) {}
+    SyntaxHighlighter(QTextDocument *document) : QSyntaxHighlighter(document) {}
 
     void setOperators(const QStringList &ops) {
         m_ops = ops;
@@ -34,6 +34,7 @@ public:
         bytesPerLine = bpl;
         updateLineNumberAreaWidth();
     }
+    SyntaxHighlighter *highlighter() const { return m_highlighter; }
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -47,6 +48,7 @@ private slots:
 
 private:
     QWidget *lineNumberArea;
+    SyntaxHighlighter *m_highlighter;
     int bytesPerLine = 4;
 };
 

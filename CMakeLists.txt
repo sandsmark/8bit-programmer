@@ -36,6 +36,8 @@ set(PROJECT_SOURCES
         Modem.cpp
         AudioBuffer.cpp
         AudioBuffer.h
+        CPU.cpp
+        CPU.h
 
         CodeTextEdit.cpp
         CodeTextEdit.h

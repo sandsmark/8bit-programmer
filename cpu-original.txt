@@ -1,6 +1,6 @@
 # Lines that start with # are ignored, 'bits: ##' describes number of bits in # an opcode,
 # and the rest are interpreted as operators.
-bits: 16
+bits: 8
 
 # Fields are separated with ;
 #Name  Binary   Operators    Description
@@ -14,14 +14,7 @@ bits: 16
  jc;   0b00111; 1;           Jump to %1 if result of last calculation overflowed
  jz;   0b01000; 1;           Jump to %1 if result of last calculation was zero
 
- addi; 0b01001; 1;           Add value %1 to content of register A (Extended only)
- subi; 0b01010; 1;           Subtract value %1 from content of register A (Extended only)
-
  out;  0b01110; 0;           Show content of register A on display
  hlt;  0b01111; 0;           Halt execution
 
- psh;  0b10000; 0;           Push content of register A onto stack
- pop;  0b10001; 0;           Pop top of stack into register A
- jsr;  0b10010; 1;           Jump to subroutine
- rts;  0b10011; 1;           Return from subroutine
 

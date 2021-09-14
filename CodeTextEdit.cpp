@@ -9,6 +9,7 @@
 CodeTextEdit::CodeTextEdit(QWidget *parent) : QPlainTextEdit(parent)
 {
     setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    m_highlighter = new SyntaxHighlighter(document());
 
     lineNumberArea = new LineNumberArea(this);
     lineNumberArea->setFont(font());

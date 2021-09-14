@@ -29,12 +29,11 @@
 #include <QShortcut>
 #include <QKeySequence>
 #include <QCoreApplication>
+#include <QFileInfo>
+#include <QLabel>
 
 #include <QtMath>
 
-static const char *s_settingsKeyType = "Type";
-static const char *s_settingsValExt = "Extended";
-static const char *s_settingsValOrig = "Original";
 static const char *s_settingsKeyVolume = "Volume";
 static const char *s_settingsKeyModemBaudRate = "modemBaudRate";
 static const char *s_settingsKeySerialBaudRate = "serialBaudRate";
@@ -43,6 +42,10 @@ static const char *s_settingsKeyLastFile = "lastOpenedFile";
 static const char *s_settingsKeySpaceFreq = "spaceFreq";
 static const char *s_settingsKeyMarkFreq = "markFreq";
 static const char *s_settingsKeyWaveform = "waveform";
+
+static const char *s_settingsKeyCPUFile = "cpuspec";
+static const char *s_internalCPUFile = ":/cpu-original.txt";
+static const char *s_internalExtendedCPUFile = ":/cpu-extended.txt";
 
 bool Editor::isSerialPort(const QString &name)
 {
@@ -69,6 +72,15 @@ void Editor::onDevicesUpdated(const QStringList &devices)
     }
 }
 
+static void ensureExists(const QString &from, const QString &to)
+{
+    if (!QFile::exists(to)) {
+        QFile::copy(from, to);
+    }
+    QFile file(to);
+    file.setPermissions(file.permissions() | QFileDevice::WriteUser | QFileDevice::ReadUser);
+}
+
 void Editor::updateDevices()
 {
     if (m_modem->audioAvailable()) {
@@ -90,31 +102,29 @@ void Editor::updateDevices()
     // TODO: update serial ports
 }
 
-Editor::Editor(QWidget *parent)
-    : QWidget(parent),
-    m_ops {
-        {"nop",  { 0b00000, 0, "Do nothing", Type::Original }},
-        {"lda",  { 0b00001, 1, "Load contents of memory address %1 into register A", Type::Original }},
-        {"add",  { 0b00010, 1, "Add memory content at %1 to content of register A", Type::Original }},
-        {"sub",  { 0b00011, 1, "Subtract memory content at %1 from content of register A", Type::Original }},
-        {"sta",  { 0b00100, 0, "Store contents of a", Type::Original }},
-        {"ldi",  { 0b00101, 1, "Store %1 to instruction register", Type::Original }},
-        {"jmp",  { 0b00110, 1, "Jump to %1", Type::Original }},
-        {"jc",   { 0b00111, 1, "Jump to %1 if result of last calculation overflowed", Type::Original }},
-        {"jz",   { 0b01000, 1, "Jump to %1 if result of last calculation was zero", Type::Original }},
+void Editor::onLoadCPUClicked()
+{
+    QSettings settings;
+    const QString lastPath = settings.value(s_settingsKeyCPUFile).toString();
 
-        // TODO: these are only valid for the extended, but we don't check
-        {"addi", { 0b01001, 1, "Add value %1 to content of register A (Extended only)", Type::Extended }},
-        {"subi", { 0b01010, 1, "Subtract value %1 from content of register A (Extended only)", Type::Extended }},
+    QDir appDir(qApp->applicationDirPath());
 
-        {"out",  { 0b01110, 0, "Show content of register A on display", Type::Original }},
-        {"hlt",  { 0b01111, 0, "Halt execution", Type::Original }},
-
-        {"psh",  { 0b10000, 0, "Push content of register A onto stack", Type::Extended }},
-        {"pop",  { 0b10000, 0, "Pop top of stack into register A", Type::Extended }},
-        {"jsr",  { 0b10000, 1, "Jump to subroutine", Type::Extended }},
-        {"rts",  { 0b10000, 1, "Return from subroutine", Type::Extended }},
+    QString dirPath = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    if (!lastPath.isEmpty() && !lastPath.startsWith(":/") && QFileInfo(lastPath).absoluteDir().exists()) {
+        dirPath = QFileInfo(lastPath).absoluteFilePath();
+    } else if (QFileInfo(appDir.absolutePath()).isWritable()) {
+        dirPath = appDir.absolutePath();
     }
+    QString newPath = QFileDialog::getOpenFileName(this, "Select CPU spec file", dirPath, "CPU specification (*.txt)");
+    if (newPath.isEmpty()) {
+        return;
+    }
+    settings.setValue(s_settingsKeyCPUFile, newPath);
+    reloadCPU();
+}
+
+Editor::Editor(QWidget *parent)
+    : QWidget(parent)
 {
     // TODO: make user definable, need another tab
 
@@ -131,11 +141,10 @@ Editor::Editor(QWidget *parent)
 
     topLayout->addStretch();
 
-    topLayout->addWidget(new QLabel("CPU Type:"));
-
-    m_typeDropdown = new QComboBox;
-    m_typeDropdown->addItems({"Original Ben Eater (4 bit memory)", "Extended (8 bit memory)"});
-    topLayout->addWidget(m_typeDropdown);
+    m_cpuInfoLabel = new QLabel("");
+    topLayout->addWidget(m_cpuInfoLabel);
+    m_loadCPUButton = new QPushButton("Load CPU...");
+    topLayout->addWidget(m_loadCPUButton);
 
     QHBoxLayout *editorLayout = new QHBoxLayout;
     editorLayout->setMargin(0);
@@ -144,12 +153,11 @@ Editor::Editor(QWidget *parent)
 
     // Editor
     m_asmEdit = new CodeTextEdit(this);
-    new SyntaxHighlighter(m_asmEdit->document(), m_ops.keys());
     editorLayout->addWidget(m_asmEdit);
 
     m_binOutput = new QPlainTextEdit;
     m_binOutput->setReadOnly(true);
-    new SyntaxHighlighter(m_binOutput->document(), {});
+    new SyntaxHighlighter(m_binOutput->document());
     editorLayout->addWidget(m_binOutput);
 
     // Uploader
@@ -279,16 +287,6 @@ Editor::Editor(QWidget *parent)
 
     QSettings settings;
 
-    const QString lastType = settings.value(s_settingsKeyType).toString();
-    if (lastType == s_settingsValExt) {
-        m_type = Type::Extended;
-        m_typeDropdown->setCurrentIndex(1);
-        m_asmEdit->setBytesPerLine(2);
-    } else {
-        m_type = Type::Original;
-        m_asmEdit->setBytesPerLine(1);
-    }
-
     loadFile(settings.value(s_settingsKeyLastFile).toString());
     const QString lastOutputDevice = settings.value(s_settingsKeyLastOutput).toString();
     if (isSerialPort(lastOutputDevice) || m_modem->audioOutputDevices().contains(lastOutputDevice)) {
@@ -316,6 +314,7 @@ Editor::Editor(QWidget *parent)
 
     m_modem->setWaveform(settings.value(s_settingsKeyWaveform, AudioBuffer::Sine).toInt());
     m_waveformSelect->setCurrentIndex(m_modem->currentWaveform());
+    reloadCPU();
 
     QTimer *timer = new QTimer(this);
     timer->setSingleShot(true);
@@ -328,10 +327,10 @@ Editor::Editor(QWidget *parent)
     connect(newFileButton, &QPushButton::clicked, this, &Editor::onNewFileClicked);
     connect(openFileButton, &QPushButton::clicked, this, &Editor::onLoadFileClicked);
     connect(saveFileButton, &QPushButton::clicked, this, &Editor::saveAs);
+    connect(m_loadCPUButton, &QPushButton::clicked, this, &Editor::onLoadCPUClicked);
     connect(m_asmEdit->verticalScrollBar(), &QScrollBar::valueChanged, this, &Editor::onScrolled);
     connect(m_asmEdit, &QPlainTextEdit::textChanged, this, &Editor::onAsmChanged);
     connect(m_asmEdit, &QPlainTextEdit::cursorPositionChanged, this, &Editor::onCursorMoved);
-    connect(m_typeDropdown, &QComboBox::currentTextChanged, this, &Editor::onTypeChanged); // meh, use currenttext because the other is overloaded
     connect(m_baudSelect, &QComboBox::textActivated, this, &Editor::onBaudChanged); // meh, use currenttext because the other is overloaded
     connect(m_spaceFreq, &QSpinBox::textChanged, this, &Editor::onFrequencyChanged); // valueChanged is fucked because wtf qt
     connect(m_markFreq, &QSpinBox::textChanged, this, &Editor::onFrequencyChanged); // valueChanged is fucked because wtf qt
@@ -350,102 +349,11 @@ Editor::Editor(QWidget *parent)
     setSettingsVisible(false);
 
     restoreGeometry(settings.value("geometry").toByteArray());
-
-    //loadCPU(":/cpu-original.txt");
 }
 
 Editor::~Editor()
 {
     save();
-}
-
-Editor::CPU Editor::loadCPU(const QString &filename)
-{
-    QFile file(filename);
-    if (!file.open(QIODevice::ReadOnly)) {
-        QMessageBox::warning(this, "Failed top open operators file", file.errorString());
-        return {};
-    }
-    CPU cpu;
-    QSet<uint8_t> usedOpcodes;
-    while (!file.atEnd()) {
-        const QString &line = QString::fromUtf8(file.readLine()).simplified();
-        if (line.startsWith('#')) {
-            continue;
-        }
-        if (line.isEmpty()) {
-            continue;
-        }
-        bool ok;
-        if (line.startsWith("bits:")) {
-            int bits = line.split(':').last().toInt(&ok);
-            if (!ok) {
-                QMessageBox::warning(this, "Invalid operators file", "Invalid bits specification:\n" + line);
-                return {};
-            }
-            if (bits != 8 && bits != 16) {
-                QMessageBox::warning(this, "Invalid operators file", "Only 8 and 16 bit opcodes are supported:\n" + line);
-                return {};
-            }
-            cpu.bits = bits;
-            qDebug() << "Bits:" << cpu.bits;
-            continue;
-        }
-        const QStringList parts = line.split(';');
-        if (parts.count() != 4) {
-            QMessageBox::warning(this, "Invalid operators file", "Invalid line:\n" + line);
-            return {};
-        }
-        const QString name = parts[0].trimmed();
-        if (name.isEmpty()) {
-            QMessageBox::warning(this, "Invalid operators file", "Missing operator name:\n" + line);
-            return {};
-        }
-        if (cpu.operators.contains(name)) {
-            QMessageBox::warning(this, "Invalid operators file", "Duplicate operator:\n" + line);
-            return {};
-        }
-        Operator op;
-        QString opcode = parts[1].trimmed();
-
-        if (opcode.startsWith("0b")) {
-            opcode = opcode.mid(2);
-            op.opcode = opcode.toInt(&ok, 2);
-        } else if (opcode.startsWith("0x")) {
-            op.opcode = opcode.toInt(&ok, 0);
-        } else {
-            op.opcode = opcode.toInt(&ok);
-        }
-        if (!ok) {
-            QMessageBox::warning(this, "Invalid operators file", "Invalid opcode on line:\n" + line);
-            return {};
-        }
-        if (usedOpcodes.contains(op.opcode)) {
-            QMessageBox::warning(this, "Invalid operators file", "Duplicate opcode on line:\n" + line);
-            return {};
-        }
-        usedOpcodes.insert(op.opcode);
-
-        op.numArguments = parts[2].trimmed().toInt(&ok);
-        if (!ok || op.numArguments < 0) {
-            QMessageBox::warning(this, "Invalid operators file", "Invalid number of operators on line:\n" + line);
-            return {};
-        }
-        if (op.numArguments > 1) {
-            QMessageBox::warning(this, "Invalid operators file", "Only supports 0 or 1 operators for now:\n" + line);
-            return {};
-        }
-        op.help = parts[3].trimmed();
-        if (op.numArguments == 0 && op.help.contains("%1")) {
-            QMessageBox::warning(this, "Invalid operators file", "Description can't contain %1 for ops without arguments:\n" + line);
-            return {};
-        }
-
-        cpu.operators[name] = op;
-        qDebug() << name << op.opcode << op.help;
-    }
-
-    return cpu;
 }
 
 void Editor::closeEvent(QCloseEvent *event)
@@ -455,21 +363,39 @@ void Editor::closeEvent(QCloseEvent *event)
     QWidget::closeEvent(event);
 }
 
-void Editor::onTypeChanged()
+void Editor::reloadCPU()
 {
-    QSettings settings;
-    switch(m_typeDropdown->currentIndex()) {
-    case 0:
-        m_type = Type::Original;
-        settings.setValue(s_settingsKeyType, s_settingsValOrig);
-        m_asmEdit->setBytesPerLine(1);
-        break;
-    case 1:
-        settings.setValue(s_settingsKeyType, s_settingsValExt);
-        m_type = Type::Extended;
-        m_asmEdit->setBytesPerLine(2);
-        break;
+    QString defaultCPUFile;
+
+    QDir appDir(qApp->applicationDirPath());
+    if (QFileInfo(appDir.absolutePath()).isWritable()) {
+        defaultCPUFile = appDir.absoluteFilePath("cpu-original.txt");
+        ensureExists(s_internalCPUFile, defaultCPUFile);
+        const QString extendedCPUFile = appDir.absoluteFilePath("cpu-extended.txt");
+        ensureExists(s_internalExtendedCPUFile, extendedCPUFile);
     }
+
+    QSettings settings;
+    QString cpuFile = settings.value(s_settingsKeyCPUFile, defaultCPUFile).toString();
+
+    if (cpuFile.isEmpty()) {
+        cpuFile = defaultCPUFile;
+    }
+    if (!m_cpu.loadFile(cpuFile) || !m_cpu.isValid()) {
+        qDebug() << "Loading" << cpuFile << "failed, using bundled";
+        cpuFile = s_internalCPUFile;
+        m_cpu.loadFile(cpuFile);
+        settings.setValue(s_settingsKeyCPUFile, cpuFile);
+    }
+    Q_ASSERT(m_cpu.isValid());
+    m_cpuInfoLabel->setText(QFileInfo(cpuFile).fileName());
+
+    if (m_cpu.bits() == 8) {
+        m_asmEdit->setBytesPerLine(1);
+    } else {
+        m_asmEdit->setBytesPerLine(2);
+    }
+    m_asmEdit->highlighter()->setOperators(m_cpu.operators().keys());
     onAsmChanged();
 }
 
@@ -952,20 +878,20 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
             helpText += " (named " + tokens[2] + ")";
         }
     } else {
-        if (!m_ops.contains(op)) {
+        if (!m_cpu.operators().contains(op)) {
             return "; Invalid operator '" + op + "'\n";
         }
-        if (tokens.count() != m_ops[op].numArguments + 1) {
-            return "; Operator '" + op + "' takes " + QString::number(m_ops[op].numArguments) + " argument(s)\n";
+        if (tokens.count() != m_cpu.operators()[op].numArguments + 1) {
+            return "; Operator '" + op + "' takes " + QString::number(m_cpu.operators()[op].numArguments) + " argument(s)\n";
         }
-        if (m_type == Type::Original) {
-            binary = m_ops[op].opcode << 4;
+        if (m_cpu.bits() == 8) {
+            binary = m_cpu.operators()[op].opcode << 4;
             (*num)++;
         } else {
-            binary = m_ops[op].opcode;
+            binary = m_cpu.operators()[op].opcode;
         }
         address = *num;
-        helpText = m_ops[op].help;
+        helpText = m_cpu.operators()[op].help;
 
     }
 
@@ -985,7 +911,7 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
             return "; Invalid value '" + tokens[1] + "'\n";
         }
 
-        if (value > 0xF && (m_type == Type::Original && op != ".db")) {
+        if (value > 0xF && (m_cpu.bits() == 8 && op != ".db")) {
             return "; Value out of range: " + QString::number(value) + "\n";
         }
 
@@ -995,7 +921,7 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
             helpText = helpText.arg(value);
         }
 
-        if (m_type == Type::Original) {
+        if (m_cpu.bits() == 8) {
             binary |= value & 0xF;
         } else {
             if (op == ".db") {
@@ -1007,14 +933,14 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
     }
 
     QString ret;
-    if (m_type == Type::Extended && op != ".db") {
+    if (m_cpu.bits() == 16 && op != ".db") {
         ret = "; " + line.mid(0, eol).simplified() + ": " + helpText + "\n";
         helpText.clear();
     }
     for (int i=0; i<2; i++) {
         const QByteArray binaryString = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(binary & 0xFF)).toLatin1();
         QByteArray addressString;
-        if (m_type == Type::Original) {
+        if (m_cpu.bits() == 8) {
             addressString = QString::asprintf(NIBBLE_TO_BINARY_PATTERN, NIBBLE_TO_BINARY(address)).toLatin1();
         } else {
             addressString = QString::asprintf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(address)).toLatin1();
@@ -1039,7 +965,7 @@ QString Editor::parseToBinary(const QString &line, int *num, bool firstPass)
             break;
         }
 
-        if (m_type == Type::Original) {
+        if (m_cpu.bits() == 8) {
             break;
         }
 

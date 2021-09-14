@@ -1,5 +1,7 @@
 #pragma once
 
+#include "CPU.h"
+
 #include <QWidget>
 #include <QHash>
 #include <QMap>
@@ -57,28 +59,12 @@ class QHBoxLayout;
 class QSpinBox;
 class QPushButton;
 class QProgressBar;
+class QLabel;
 class Modem;
 
 class Editor : public QWidget
 {
     Q_OBJECT
-
-    enum class Type {
-        Original,
-        Extended
-    };
-
-    struct Operator {
-        uint8_t opcode;
-        int numArguments = 0; // todo use
-        QString help;
-        Type type;
-    };
-
-    struct CPU {
-        uint8_t bits = 8;
-        QHash<QString, Operator> operators;
-    };
 
 public:
     Editor(QWidget *parent = nullptr);
@@ -94,7 +80,6 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 private slots:
-    void onTypeChanged();
     void onAsmChanged();
     void onUploadClicked();
     void onUploadFinished();
@@ -111,11 +96,12 @@ private slots:
     void setVolume(const int percent);
     void onWaveformSelected(int waveform);
     void updateDevices();
+    void onLoadCPUClicked();
 
 private:
     static bool isSerialPort(const QString &name);
     bool loadFile(const QString &path);
-    CPU loadCPU(const QString &file);
+    void reloadCPU();
 
     int currentLineNumber();
     void scrollOutputTo(const int line);
@@ -127,12 +113,11 @@ private:
 
     CodeTextEdit *m_asmEdit = nullptr;
     QPlainTextEdit *m_binOutput = nullptr;
-    const QHash<QString, Operator> m_ops;
     QMap<uint32_t, uint8_t> m_memory; // qmap is sorted
     QPlainTextEdit *m_memContents = nullptr;
     DeviceList *m_outputSelect = nullptr;
-
-    QComboBox *m_typeDropdown = nullptr;
+    QPushButton *m_loadCPUButton = nullptr;
+    QLabel *m_cpuInfoLabel = nullptr;
 
     QPushButton *m_uploadButton = nullptr;
     QPlainTextEdit *m_serialOutput = nullptr;
@@ -146,7 +131,7 @@ private:
 
     QString m_currentFile;
 
-    Type m_type = Type::Original;
+    CPU m_cpu;
 
     QComboBox *m_baudSelect;
     QComboBox *m_waveformSelect;
