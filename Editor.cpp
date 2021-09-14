@@ -141,10 +141,11 @@ Editor::Editor(QWidget *parent)
 
     topLayout->addStretch();
 
+    m_loadCPUButton = new QPushButton("Load CPU...");
+    m_loadCPUButton->setIcon(QIcon::fromTheme("document-import"));
+    topLayout->addWidget(m_loadCPUButton);
     m_cpuInfoLabel = new QLabel("");
     topLayout->addWidget(m_cpuInfoLabel);
-    m_loadCPUButton = new QPushButton("Load CPU...");
-    topLayout->addWidget(m_loadCPUButton);
 
     QHBoxLayout *editorLayout = new QHBoxLayout;
     editorLayout->setMargin(0);
@@ -162,6 +163,7 @@ Editor::Editor(QWidget *parent)
 
     // Uploader
     m_uploadButton = new QPushButton("Upload (F5)");
+    m_uploadButton->setIcon(QIcon::fromTheme("cloud-upload"));
     m_uploadButton->setShortcut(Qt::Key_F5);
     m_uploadButton->setEnabled(false); // Disabled unless there's a serial port available
     m_uploadButton->setCheckable(true);
@@ -182,8 +184,9 @@ Editor::Editor(QWidget *parent)
         }
     }
 
-    QPushButton *settingsButton = new QPushButton(tr("Settings"));
+    QPushButton *settingsButton = new QPushButton(tr("Modem settings"));
     settingsButton->setCheckable(true);
+    settingsButton->setIcon(QIcon::fromTheme("configure"));
 
     for (const QSerialPortInfo &portInfo : QSerialPortInfo::availablePorts()) {
         m_outputSelect->addItem(portInfo.portName());
@@ -196,6 +199,7 @@ Editor::Editor(QWidget *parent)
     m_outputSelect->setMinimumWidth(200);
 
     m_refreshButton = new QPushButton(tr("Refresh"));
+    m_refreshButton->setIcon(QIcon::fromTheme("view-refresh"));
 
     uploadLayout->addWidget(new QLabel("Memory contents:"));
     uploadLayout->addStretch();
