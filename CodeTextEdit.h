@@ -10,10 +10,15 @@ class SyntaxHighlighter : public QSyntaxHighlighter
 public:
     SyntaxHighlighter(QTextDocument *document, const QStringList &ops) : QSyntaxHighlighter(document), m_ops(ops) {}
 
+    void setOperators(const QStringList &ops) {
+        m_ops = ops;
+        rehighlight();
+    }
+
 protected:
     void highlightBlock(const QString &text) override;
 
-    const QStringList m_ops;
+    QStringList m_ops;
 };
 
 class CodeTextEdit : public QPlainTextEdit

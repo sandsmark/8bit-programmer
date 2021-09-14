@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/">
+        <file>cpu-original.txt</file>
+        <file>cpu-extended.txt</file>
+    </qresource>
+</RCC>

@@ -40,6 +40,8 @@ set(PROJECT_SOURCES
         CodeTextEdit.cpp
         CodeTextEdit.h
 
+        data.qrc
+
         MiniAudio_impl.cpp
 )
 

@@ -351,7 +351,7 @@ Editor::Editor(QWidget *parent)
 
     restoreGeometry(settings.value("geometry").toByteArray());
 
-    //loadOperators(":/operators.txt");
+    //loadCPU(":/cpu-original.txt");
 }
 
 Editor::~Editor()
