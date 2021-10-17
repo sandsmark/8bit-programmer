@@ -759,34 +759,16 @@ void Editor::highlightOutput(const int firstLine, const int lastLine)
     QTextCursor cursor = m_binOutput->textCursor();
     cursor.clearSelection();
 
-    m_binOutput->moveCursor(QTextCursor::Start);
-
-    int line = 0;
-    while (!cursor.atEnd()) {
-        line += cursor.block().lineCount();
-        if (line > firstLine) {
-            break;
-        }
-        m_binOutput->moveCursor(QTextCursor::NextBlock, QTextCursor::MoveAnchor);
+    cursor.movePosition(QTextCursor::Start);
+    cursor.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, firstLine);
+    if (lastLine != -1) {
+        cursor.movePosition(QTextCursor::NextBlock, QTextCursor::KeepAnchor, lastLine - firstLine);
+    } else {
+        cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
     }
-
-    if (lastLine == firstLine) {
-        return;
-    }
-
-    while (!cursor.atEnd()) {
-        m_binOutput->moveCursor(QTextCursor::NextBlock, QTextCursor::KeepAnchor);
-        line += cursor.block().lineCount();
-        if (line != -1 && line >= lastLine) {
-            break;
-        }
-    }
-
-    if (lastLine == -1) {
-        m_binOutput->moveCursor(QTextCursor::End, QTextCursor::KeepAnchor);
-        // Skip the last newline at the end
-        m_binOutput->moveCursor(QTextCursor::Left, QTextCursor::KeepAnchor);
-    }
+    // Skip the last newline at the end
+    cursor.movePosition(QTextCursor::Left, QTextCursor::KeepAnchor);
+    m_binOutput->setTextCursor(cursor);
 }
 
 bool Editor::save()
