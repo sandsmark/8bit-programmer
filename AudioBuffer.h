@@ -51,9 +51,6 @@ private:
         StopBit = AnsweringMark,
         ToneCount
     };
-    enum Bit {
-
-    };
 
     inline int frequency(const Tone tone) {
         switch(tone) {
