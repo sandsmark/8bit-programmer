@@ -97,6 +97,7 @@ private slots:
     void onWaveformSelected(int waveform);
     void updateDevices();
     void onLoadCPUClicked();
+    void onEditCPUClicked();
 
 private:
     bool isSerialPort(const QString &name);
@@ -116,7 +117,6 @@ private:
     QMap<uint32_t, uint8_t> m_memory; // qmap is sorted
     QPlainTextEdit *m_memContents = nullptr;
     DeviceList *m_outputSelect = nullptr;
-    QPushButton *m_loadCPUButton = nullptr;
     QLabel *m_cpuInfoLabel = nullptr;
 
     QPushButton *m_uploadButton = nullptr;

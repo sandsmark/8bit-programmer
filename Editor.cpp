@@ -31,6 +31,7 @@
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <QLabel>
+#include <QDesktopServices>
 
 #include <QtMath>
 
@@ -128,6 +129,16 @@ void Editor::onLoadCPUClicked()
     reloadCPU();
 }
 
+void Editor::onEditCPUClicked()
+{
+    QSettings settings;
+    const QString lastPath = settings.value(s_settingsKeyCPUFile).toString();
+    if (lastPath.isEmpty()) {
+        return;
+    }
+    QDesktopServices::openUrl(lastPath);
+}
+
 Editor::Editor(QWidget *parent)
     : QWidget(parent)
 {
@@ -146,11 +157,14 @@ Editor::Editor(QWidget *parent)
 
     topLayout->addStretch();
 
-    m_loadCPUButton = new QPushButton("Load CPU...");
-    m_loadCPUButton->setIcon(QIcon::fromTheme("document-import"));
-    topLayout->addWidget(m_loadCPUButton);
+    QPushButton *loadCPUButton = new QPushButton("Load CPU...");
+    loadCPUButton->setIcon(QIcon::fromTheme("document-import"));
+    topLayout->addWidget(loadCPUButton);
     m_cpuInfoLabel = new QLabel("");
     topLayout->addWidget(m_cpuInfoLabel);
+    QPushButton *editCPUButton = new QPushButton("Edit CPU");
+    editCPUButton->setIcon(QIcon::fromTheme("document-edit"));
+    topLayout->addWidget(editCPUButton);
 
     QHBoxLayout *editorLayout = new QHBoxLayout;
     editorLayout->setMargin(0);
@@ -337,7 +351,8 @@ Editor::Editor(QWidget *parent)
     connect(newFileButton, &QPushButton::clicked, this, &Editor::onNewFileClicked);
     connect(openFileButton, &QPushButton::clicked, this, &Editor::onLoadFileClicked);
     connect(saveFileButton, &QPushButton::clicked, this, &Editor::saveAs);
-    connect(m_loadCPUButton, &QPushButton::clicked, this, &Editor::onLoadCPUClicked);
+    connect(loadCPUButton, &QPushButton::clicked, this, &Editor::onLoadCPUClicked);
+    connect(editCPUButton, &QPushButton::clicked, this, &Editor::onEditCPUClicked);
     connect(m_asmEdit->verticalScrollBar(), &QScrollBar::valueChanged, this, &Editor::onScrolled);
     connect(m_asmEdit, &QPlainTextEdit::textChanged, this, &Editor::onAsmChanged);
     connect(m_asmEdit, &QPlainTextEdit::cursorPositionChanged, this, &Editor::onCursorMoved);
