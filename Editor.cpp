@@ -52,7 +52,7 @@ bool Editor::isSerialPort(const QString &name)
     if (name.isEmpty()) {
         return false;
     }
-    return !QSerialPortInfo(name).isNull();
+    return m_serialPorts.contains(name);
 }
 
 void Editor::onDevicesUpdated(const QStringList &devices)
@@ -60,11 +60,11 @@ void Editor::onDevicesUpdated(const QStringList &devices)
     const QString selectedDevice = m_outputSelect->currentText();
     m_outputSelect->clear();
 
-    for (const QSerialPortInfo &portInfo : QSerialPortInfo::availablePorts()) {
-        m_outputSelect->addItem(portInfo.portName());
-    }
-
     m_outputSelect->addItems(devices);
+
+    for (const QString &port : m_serialPorts) {
+        m_outputSelect->addItem(port);
+    }
 
     int newIndex = m_outputSelect->findText(selectedDevice);
     if (newIndex != -1) {
@@ -83,6 +83,11 @@ static void ensureExists(const QString &from, const QString &to)
 
 void Editor::updateDevices()
 {
+    m_serialPorts.clear();
+    for (const QSerialPortInfo &portInfo : QSerialPortInfo::availablePorts()) {
+        m_serialPorts.append(portInfo.portName());
+    }
+
     if (m_modem->audioAvailable()) {
         m_modem->updateAudioDevices();
         return;
@@ -91,8 +96,8 @@ void Editor::updateDevices()
     const QString selectedDevice = m_outputSelect->currentText();
     m_outputSelect->clear();
 
-    for (const QSerialPortInfo &portInfo : QSerialPortInfo::availablePorts()) {
-        m_outputSelect->addItem(portInfo.portName());
+    for (const QString &port : m_serialPorts) {
+        m_outputSelect->addItem(port);
     }
 
     int newIndex = m_outputSelect->findText(selectedDevice);
@@ -189,6 +194,7 @@ Editor::Editor(QWidget *parent)
     settingsButton->setIcon(QIcon::fromTheme("configure"));
 
     for (const QSerialPortInfo &portInfo : QSerialPortInfo::availablePorts()) {
+        m_serialPorts.append(portInfo.portName());
         m_outputSelect->addItem(portInfo.portName());
     }
 

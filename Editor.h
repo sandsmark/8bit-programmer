@@ -99,7 +99,7 @@ private slots:
     void onLoadCPUClicked();
 
 private:
-    static bool isSerialPort(const QString &name);
+    bool isSerialPort(const QString &name);
     bool loadFile(const QString &path);
     void reloadCPU();
 
@@ -142,4 +142,5 @@ private:
     QSpinBox *m_markFreq;
 
     Modem *m_modem;
+    QStringList m_serialPorts;
 };
